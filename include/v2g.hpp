@@ -11,8 +11,8 @@
 #include <atomic>
 #include <cstdint>
 #include <netinet/in.h>
-#include "freertos_shim.hpp"
-#include "freertos_sync.hpp"
+#include <freertos_shim.hpp>
+#include <freertos_sync.hpp>
 #include <vector>
 
 #include "mbedtls_util.hpp"

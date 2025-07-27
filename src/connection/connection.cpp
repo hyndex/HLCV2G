@@ -2,11 +2,11 @@
 // Copyright (C) 2022-2023 chargebyte GmbH
 // Copyright (C) 2022-2023 Contributors to EVerest
 
-#include "connection.hpp"
+#include <connection/connection.hpp>
 #include "esp_log.h"
-#include "tls_connection.hpp"
+#include <connection/tls_connection.hpp>
 #include "tools.hpp"
-#include "v2g_server.hpp"
+#include <v2g_server.hpp>
 
 static const char* TAG = "connection";
 
@@ -26,7 +26,7 @@ static const char* TAG = "connection";
 #include <string>
 #include <sys/socket.h>
 #include <time.h>
-#include "freertos_shim.hpp"
+#include <freertos_shim.hpp>
 #include <unistd.h>
 
 #define DEFAULT_SOCKET_BACKLOG        3

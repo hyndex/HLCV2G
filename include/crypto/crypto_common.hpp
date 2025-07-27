@@ -4,7 +4,7 @@
 #ifndef CRTYPTO_COMMON_HPP_
 #define CRTYPTO_COMMON_HPP_
 
-#include "../mbedtls_util.hpp"
+#include <mbedtls_util.hpp>
 
 #include <cstddef>
 

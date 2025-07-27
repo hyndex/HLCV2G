@@ -8,11 +8,11 @@
 #include <errno.h>
 #include <math.h>
 
-#include "freertos_shim.hpp"
-#include "freertos_sync.hpp"
+#include <freertos_shim.hpp>
+#include <freertos_sync.hpp>
 
 #include "esp_log.h"
-#include "v2g_ctx.hpp"
+#include <v2g_ctx.hpp>
 
 static const char* TAG = "v2g_ctx";
 
