@@ -216,3 +216,45 @@ target_link_libraries(${V2GCTX_NAME}
 
 add_test(${V2GCTX_NAME} ${V2GCTX_NAME})
 ev_register_test_target(${V2GCTX_NAME})
+
+set(ISO_SERVER_TEST_NAME iso_server_test)
+add_executable(${ISO_SERVER_TEST_NAME})
+add_dependencies(${ISO_SERVER_TEST_NAME} generate_cpp_files)
+
+target_include_directories(${ISO_SERVER_TEST_NAME} PRIVATE
+    .. ../connection ../../../tests/include
+    ${GENERATED_INCLUDE_DIR}
+    ${CMAKE_BINARY_DIR}/generated/modules/${MODULE_NAME}
+    ${CMAKE_BINARY_DIR}/generated/include
+)
+
+target_compile_definitions(${ISO_SERVER_TEST_NAME} PRIVATE
+    -DUNIT_TEST
+    -DLIBEVSE_CRYPTO_SUPPLIER_OPENSSL
+)
+
+target_sources(${ISO_SERVER_TEST_NAME} PRIVATE
+    iso_server_test.cpp
+    log.cpp
+    ../v2g_ctx.cpp
+    ../tools.cpp
+)
+
+target_link_libraries(${ISO_SERVER_TEST_NAME}
+    PRIVATE
+        GTest::gtest_main
+        OpenSSL::SSL
+        OpenSSL::Crypto
+        cbv2g::din
+        cbv2g::iso2
+        cbv2g::tp
+        everest::framework
+        everest::evse_security
+        mbedtls
+        mbedcrypto
+        mbedx509
+        -levent -lpthread -levent_pthreads
+)
+
+add_test(${ISO_SERVER_TEST_NAME} ${ISO_SERVER_TEST_NAME})
+ev_register_test_target(${ISO_SERVER_TEST_NAME})
