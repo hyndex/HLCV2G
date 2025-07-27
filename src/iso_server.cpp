@@ -578,24 +578,41 @@ static enum v2g_event handle_iso_session_setup(struct v2g_connection* conn) {
      * "OK_NewSessionEstablished"
      */
 
-    // TODO: handle resuming sessions [V2G2-463]
+    /* Session handling and recovery */
+    bool resume_session = false;
+    bool known_session =
+        (conn->ctx->ev_v2g_data.received_session_id != 0) &&
+        (conn->ctx->ev_v2g_data.received_session_id == conn->ctx->evse_v2g_data.session_id);
 
-    /* Now fill the evse response message */
-    res->ResponseCode = iso2_responseCodeType_OK_NewSessionEstablished;
-
-    /* Check and init session id */
-    /* If no session id is configured, generate one */
     srand((unsigned int)time(NULL));
-    if (conn->ctx->evse_v2g_data.session_id == (uint64_t)0 ||
-        conn->ctx->evse_v2g_data.session_id != conn->ctx->ev_v2g_data.received_session_id) {
-        conn->ctx->evse_v2g_data.session_id =
-            ((uint64_t)rand() << 48) | ((uint64_t)rand() << 32) | ((uint64_t)rand() << 16) | (uint64_t)rand();
-        ESP_LOGI(TAG, "No session_id found or not equal to the id from the preceding v2g session. Generating random session id.");
-        ESP_LOGI(TAG, "Created new session with id 0x%08" PRIu64, conn->ctx->evse_v2g_data.session_id);
-    } else {
-        ESP_LOGI(TAG, "Found Session_id from the old session: 0x%08" PRIu64,
-             conn->ctx->evse_v2g_data.session_id);
-        res->ResponseCode = iso2_responseCodeType_OK_OldSessionJoined;
+    if (known_session) {
+        if (conn->ctx->hlc_pause_active) {
+            ESP_LOGI(TAG, "Found Session_id from the old session: 0x%08" PRIu64,
+                     conn->ctx->evse_v2g_data.session_id);
+            res->ResponseCode = iso2_responseCodeType_OK_OldSessionJoined;
+            resume_session = true;
+            conn->ctx->hlc_pause_active = false; // clear pause flag on resume
+        } else {
+            ESP_LOGW(TAG, "Received known SessionID but no paused session. Rejecting resumption");
+            res->ResponseCode = iso2_responseCodeType_FAILED_UnknownSession;
+            conn->ctx->evse_v2g_data.session_id = 0;
+        }
+    }
+
+    if (!known_session || !resume_session) {
+        if (res->ResponseCode != iso2_responseCodeType_FAILED_UnknownSession) {
+            res->ResponseCode = iso2_responseCodeType_OK_NewSessionEstablished;
+
+            if (conn->ctx->evse_v2g_data.session_id == (uint64_t)0 ||
+                conn->ctx->evse_v2g_data.session_id != conn->ctx->ev_v2g_data.received_session_id) {
+                conn->ctx->evse_v2g_data.session_id = ((uint64_t)rand() << 48) | ((uint64_t)rand() << 32) |
+                                                     ((uint64_t)rand() << 16) | (uint64_t)rand();
+                ESP_LOGI(TAG,
+                         "No session_id found or not equal to the id from the preceding v2g session. Generating random session id.");
+                ESP_LOGI(TAG, "Created new session with id 0x%08" PRIu64,
+                         conn->ctx->evse_v2g_data.session_id);
+            }
+        }
     }
 
     /* TODO: publish EVCCID to MQTT */
