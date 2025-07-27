@@ -171,6 +171,8 @@ struct SAE_Bidi_Data {
  * destructors are not called. (see v2g_ctx_create() and calloc)
  */
 struct v2g_context {
+    v2g_context();
+    ~v2g_context();
     std::atomic_bool shutdown;
 
     evse_securityIntf* r_security;
