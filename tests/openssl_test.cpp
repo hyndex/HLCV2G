@@ -7,9 +7,8 @@
 #include <cstddef>
 #include <cstring>
 #include <iso_server.hpp>
-#include <openssl/bio.h>
-#include <openssl/pem.h>
-#include <openssl_util.hpp>
+#include "mbedtls_util.hpp"
+#include <mbedtls/pk.h>
 
 #include <cbv2g/common/exi_bitstream.h>
 #include <cbv2g/exi_v2gtp.h> //for V2GTP_HEADER_LENGTHs
@@ -108,15 +107,15 @@ const char iso_exi_sig_b64_nl[] =
 #endif
 
 TEST(openssl, verifyIso) {
-    auto* bio = BIO_new_file("iso_priv.pem", "r");
-    ASSERT_NE(bio, nullptr);
-    auto* pkey = PEM_read_bio_PrivateKey(bio, nullptr, nullptr, nullptr);
-    ASSERT_NE(pkey, nullptr);
-    BIO_free(bio);
+    mbedtls_pk_context pkey;
+    mbedtls_pk_init(&pkey);
+    ASSERT_EQ(mbedtls_pk_parse_keyfile(&pkey, "iso_priv.pem", nullptr), 0);
 
-    auto sig = openssl::bn_to_signature(&iso_exi_sig[0], &iso_exi_sig[32]);
-    EXPECT_TRUE(openssl::verify(pkey, sig.get(), sig.size(), &iso_exi_b_hash[0], sizeof(iso_exi_b_hash)));
-    EVP_PKEY_free(pkey);
+    auto sig = mbedtls_util::bn_to_signature(&iso_exi_sig[0], &iso_exi_sig[32]);
+    mbedtls_util::sha_256_digest_t digest{};
+    std::memcpy(digest.data(), &iso_exi_b_hash[0], digest.size());
+    EXPECT_TRUE(mbedtls_util::verify(&pkey, &sig[0], &sig[32], digest));
+    mbedtls_pk_free(&pkey);
 }
 
 TEST(isoExi, signature) {
@@ -125,11 +124,9 @@ TEST(isoExi, signature) {
     //   body { AuthorizationReq }
     // the test vector doesn't include the entire encoded message
 
-    auto* bio = BIO_new_file("iso_priv.pem", "r");
-    ASSERT_NE(bio, nullptr);
-    auto* pkey = PEM_read_bio_PrivateKey(bio, nullptr, nullptr, nullptr);
-    ASSERT_NE(pkey, nullptr);
-    BIO_free(bio);
+    mbedtls_pk_context pkey;
+    mbedtls_pk_init(&pkey);
+    ASSERT_EQ(mbedtls_pk_parse_keyfile(&pkey, "iso_priv.pem", nullptr), 0);
 
     // decode the test vector AuthorizationReq
     struct iso2_exiFragment exi_a {};
@@ -154,12 +151,12 @@ TEST(isoExi, signature) {
     setCharacters(sig.SignedInfo.Reference.array[0].Transforms.Transform.Algorithm,
                   "http://www.w3.org/TR/canonical-exi/");
     setCharacters(sig.SignedInfo.Reference.array[0].DigestMethod.Algorithm, "http://www.w3.org/2001/04/xmlenc#sha256");
-    setBytes(sig.SignedInfo.Reference.array[0].DigestValue, &iso_exi_a_hash[0], ::openssl::sha_256_digest_size);
+    setBytes(sig.SignedInfo.Reference.array[0].DigestValue, &iso_exi_a_hash[0], mbedtls_util::sha_256_digest_size);
     // SignatureValue
-    setBytes(sig.SignatureValue.CONTENT, &iso_exi_sig[0], ::openssl::signature_size);
-    EXPECT_TRUE(crypto::openssl::check_iso2_signature(&sig, pkey, &exi_a));
+    setBytes(sig.SignatureValue.CONTENT, &iso_exi_sig[0], mbedtls_util::signature_size);
+    EXPECT_TRUE(crypto::mbedtls::check_iso2_signature(&sig, &pkey, &exi_a));
 
-    EVP_PKEY_free(pkey);
+    mbedtls_pk_free(&pkey);
 }
 
 } // namespace

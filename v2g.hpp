@@ -15,7 +15,7 @@
 #include "freertos_sync.hpp"
 #include <vector>
 
-#include <openssl_util.hpp>
+#include "mbedtls_util.hpp"
 #include <tls.hpp>
 
 #include <cbv2g/app_handshake/appHand_Datatypes.h>
@@ -200,7 +200,7 @@ struct v2g_context {
     struct {
         int fd;
     } tls_socket;
-    tls::Server* tls_server;
+    void* tls_server;
 
     bool tls_key_logging;
 
@@ -355,7 +355,7 @@ struct v2g_connection {
     } conn;
 
     tls::Connection* tls_connection;
-    openssl::pkey_ptr* pubkey;
+    mbedtls_util::pkey_ptr* pubkey;
 
     ssize_t (*read)(struct v2g_connection* conn, unsigned char* buf, std::size_t count);
     ssize_t (*write)(struct v2g_connection* conn, unsigned char* buf, std::size_t count);

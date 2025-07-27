@@ -51,7 +51,9 @@ target_link_libraries(${TLS_GTEST_NAME} PRIVATE
     cbv2g::tp
     everest::framework
     everest::evse_security
-    everest::tls
+    mbedtls
+    mbedcrypto
+    mbedx509
 )
 
 set(V2G_MAIN_NAME v2g_server)
@@ -87,7 +89,9 @@ target_link_libraries(${V2G_MAIN_NAME} PRIVATE
     everest::log
     everest::framework
     everest::evse_security
-    everest::tls
+    mbedtls
+    mbedcrypto
+    mbedx509
     -levent -lpthread -levent_pthreads
 )
 
@@ -129,7 +133,9 @@ target_link_libraries(${DIN_SERVER_NAME}
         cbv2g::tp
         everest::framework
         everest::evse_security
-        everest::tls
+        mbedtls
+        mbedcrypto
+        mbedx509
 )
 
 add_test(${DIN_SERVER_NAME} ${DIN_SERVER_NAME})
@@ -160,7 +166,9 @@ target_link_libraries(${SDP_NAME}
         GTest::gtest_main
         cbv2g::tp
         everest::framework
-        everest::tls
+        mbedtls
+        mbedcrypto
+        mbedx509
 )
 
 add_test(${SDP_NAME} ${SDP_NAME})
@@ -199,7 +207,9 @@ target_link_libraries(${V2GCTX_NAME}
         cbv2g::tp
         everest::framework
         everest::evse_security
-        everest::tls
+        mbedtls
+        mbedcrypto
+        mbedx509
         -levent -lpthread -levent_pthreads
 )
 

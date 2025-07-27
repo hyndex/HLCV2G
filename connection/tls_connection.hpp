@@ -5,7 +5,7 @@
 #define TLS_CONNECTION_HPP_
 
 #include <cstddef>
-#include <tls.hpp>
+#include <mbedtls/ssl.h>
 #include <unistd.h>
 
 struct v2g_context;
@@ -51,7 +51,7 @@ ssize_t connection_write(struct v2g_connection* conn, unsigned char* buf, std::s
  * \param ctx v2g connection context
  * \return Returns true if the configuration was built successfully, otherwise false.
  */
-bool build_config(tls::Server::config_t& config, struct v2g_context* ctx);
+bool build_config(int& config, struct v2g_context* ctx);
 
 } // namespace tls
 
