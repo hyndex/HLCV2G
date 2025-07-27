@@ -9,6 +9,7 @@
       "+<include/*>",
       "-<tests/*>",
       "-<din70121/*>"
-    ]
+    ],
+    "extraScript": "pio-build_libcbv2g.py"
   }
 }
