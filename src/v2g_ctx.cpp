@@ -14,6 +14,7 @@
 
 #include "esp_log.h"
 #include <v2g_ctx.hpp>
+#include <unistd.h>
 
 static const char* TAG = "v2g_ctx";
 
@@ -322,6 +323,36 @@ free_out:
 }
 
 void v2g_ctx_free(struct v2g_context* ctx) {
+    if (!ctx)
+        return;
+
+    ctx->shutdown = true;
+
+    if (ctx->tcp_socket != -1) {
+        close(ctx->tcp_socket);
+        ctx->tcp_socket = -1;
+    }
+
+    if (ctx->tls_socket.fd != -1) {
+        close(ctx->tls_socket.fd);
+        ctx->tls_socket.fd = -1;
+    }
+
+    if (ctx->sdp_socket > 0) {
+        close(ctx->sdp_socket);
+        ctx->sdp_socket = 0;
+    }
+
+    if (ctx->udp_socket > 0) {
+        close(ctx->udp_socket);
+        ctx->udp_socket = 0;
+    }
+
+    vTaskDelete(ctx->event_thread);
+    ctx->event_thread = nullptr;
+    vTaskDelete(ctx->tcp_thread);
+    ctx->tcp_thread = nullptr;
+
     delete ctx;
 }
 
