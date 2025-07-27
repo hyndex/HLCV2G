@@ -8,6 +8,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
+#ifdef ESP_PLATFORM
+#include "esp_netif.h"
+#endif
 #include <iomanip>
 #include <math.h>
 #include <sstream>
@@ -56,6 +59,25 @@ int generate_random_data(void* dest, size_t dest_len) {
 }
 
 const char* choose_first_ipv6_interface() {
+#ifdef ESP_PLATFORM
+#ifndef V2G_IPV6_NETIF_KEY
+#define V2G_IPV6_NETIF_KEY "WIFI_STA_DEF"
+#endif
+    static const char* candidates[] = {V2G_IPV6_NETIF_KEY, "ETH_DEF", "WIFI_STA_DEF"};
+    for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); ++i) {
+        const char* key = candidates[i];
+        esp_netif_t* netif = esp_netif_get_handle_from_ifkey(key);
+        if (netif == NULL) {
+            continue;
+        }
+        esp_ip6_addr_t ip6;
+        if (esp_netif_get_ip6_linklocal(netif, &ip6) == ESP_OK) {
+            return key;
+        }
+    }
+    dlog(DLOG_LEVEL_ERROR, "No necessary IPv6 link-local address was found!");
+    return NULL;
+#else
     struct ifaddrs *ifaddr, *ifa;
     char buffer[INET6_ADDRSTRLEN];
 
@@ -75,9 +97,48 @@ const char* choose_first_ipv6_interface() {
     }
     dlog(DLOG_LEVEL_ERROR, "No necessary IPv6 link-local address was found!");
     return NULL;
+#endif
 }
 
 int get_interface_ipv6_address(const char* if_name, enum Addr6Type type, struct sockaddr_in6* addr) {
+#ifdef ESP_PLATFORM
+    if (if_name == NULL || addr == NULL) {
+        return -1;
+    }
+
+    esp_netif_t* netif = esp_netif_get_handle_from_ifkey(if_name);
+    if (netif == NULL) {
+        dlog(DLOG_LEVEL_ERROR, "No such interface: %s", if_name);
+        return -1;
+    }
+
+    esp_ip6_addr_t ip6;
+    esp_err_t err;
+    switch (type) {
+    case ADDR6_TYPE_LINKLOCAL:
+        err = esp_netif_get_ip6_linklocal(netif, &ip6);
+        break;
+    case ADDR6_TYPE_GLOBAL:
+        err = esp_netif_get_ip6_global(netif, &ip6);
+        break;
+    default:
+        err = esp_netif_get_ip6_global(netif, &ip6);
+        if (err != ESP_OK) {
+            err = esp_netif_get_ip6_linklocal(netif, &ip6);
+        }
+        break;
+    }
+
+    if (err != ESP_OK) {
+        return -1;
+    }
+
+    memset(addr, 0, sizeof(*addr));
+    addr->sin6_family = AF_INET6;
+    memcpy(&addr->sin6_addr, &ip6, sizeof(addr->sin6_addr));
+    addr->sin6_scope_id = esp_netif_get_netif_impl_index(netif);
+    return 0;
+#else
     struct ifaddrs *ifaddr, *ifa;
     int rv = -1;
 
@@ -126,6 +187,7 @@ int get_interface_ipv6_address(const char* if_name, enum Addr6Type type, struct 
 out:
     freeifaddrs(ifaddr);
     return rv;
+#endif
 }
 
 #define NSEC_PER_SEC 1000000000L
