@@ -8,7 +8,7 @@
 #include <string>
 
 #include "crypto_common.hpp"
-#include "../mbedtls_util.hpp"
+#include <mbedtls_util.hpp>
 
 /**
  * \file OpenSSL implementation

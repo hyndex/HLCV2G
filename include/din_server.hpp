@@ -5,7 +5,7 @@
 #ifndef DIN_SERVER_HPP
 #define DIN_SERVER_HPP
 
-#include "v2g.hpp"
+#include <v2g.hpp>
 
 /*!
  * \brief The din_state_id enum

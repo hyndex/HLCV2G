@@ -4,9 +4,9 @@
 #include <array>
 #include <cassert>
 
-#include "crypto_openssl.hpp"
-#include "../mbedtls_util.hpp"
-#include "iso_server.hpp"
+#include <crypto/crypto_openssl.hpp>
+#include <mbedtls_util.hpp>
+#include <iso_server.hpp>
 #include "esp_log.h"
 
 #include <cbv2g/common/exi_bitstream.h>

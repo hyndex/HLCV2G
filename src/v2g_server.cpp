@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2023 chargebyte GmbH
 // Copyright (C) 2023 Contributors to EVerest
-#include "v2g_server.hpp"
+#include <v2g_server.hpp>
 
 #include <cstdint>
 #include <cstdlib>
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
-#include "mbedtls_util.hpp"
+#include <mbedtls_util.hpp>
 
 #include <cbv2g/app_handshake/appHand_Decoder.h>
 #include <cbv2g/app_handshake/appHand_Encoder.h>
@@ -19,11 +19,11 @@
 #include <cbv2g/iso_2/iso2_msgDefDecoder.h>
 #include <cbv2g/iso_2/iso2_msgDefEncoder.h>
 
-#include "connection.hpp"
-#include "din_server.hpp"
-#include "iso_server.hpp"
+#include <connection/connection.hpp>
+#include <din_server.hpp>
+#include <iso_server.hpp>
 #include "esp_log.h"
-#include "tools.hpp"
+#include <tools.hpp>
 
 static const char* TAG = "v2g_server";
 

@@ -1,0 +1,14 @@
+{
+  "name": "HLCV2G",
+  "version": "0.1.0",
+  "platforms": "espressif32",
+  "build": {
+    "flags": ["-std=gnu++17", "-DMBEDTLS_CONFIG_FILE=\\\"mbedtls/esp_config.h\\\""] ,
+    "srcFilter": [
+      "+<src/*>",
+      "+<include/*>",
+      "-<tests/*>",
+      "-<din70121/*>"
+    ]
+  }
+}

@@ -4,7 +4,7 @@
 #ifndef V2G_SERVER_H
 #define V2G_SERVER_H
 
-#include "v2g.hpp"
+#include <v2g.hpp>
 
 static const char* v2g_msg_type[] = {
     "Supported App Protocol",
