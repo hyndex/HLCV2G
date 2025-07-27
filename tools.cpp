@@ -8,6 +8,8 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <ifaddrs.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
 #include <iomanip>
 #include <math.h>
 #include <sstream>
@@ -21,6 +23,31 @@
 #ifdef ESP_PLATFORM
 #include "esp_netif.h"
 #endif
+
+static mbedtls_entropy_context entropy_ctx;
+static mbedtls_ctr_drbg_context ctr_drbg_ctx;
+static bool rng_initialized = false;
+
+static int init_random() {
+    if (rng_initialized)
+        return 0;
+
+    mbedtls_entropy_init(&entropy_ctx);
+    mbedtls_ctr_drbg_init(&ctr_drbg_ctx);
+
+    const char pers[] = "HLCV2G";
+    int ret = mbedtls_ctr_drbg_seed(&ctr_drbg_ctx, mbedtls_entropy_func, &entropy_ctx,
+                                    reinterpret_cast<const unsigned char*>(pers),
+                                    sizeof(pers) - 1);
+
+    if (ret == 0) {
+        rng_initialized = true;
+    } else {
+        mbedtls_ctr_drbg_free(&ctr_drbg_ctx);
+        mbedtls_entropy_free(&entropy_ctx);
+    }
+    return ret;
+}
 
 ssize_t safe_read(int fd, void* buf, size_t count) {
     for (;;) {
@@ -36,26 +63,11 @@ ssize_t safe_read(int fd, void* buf, size_t count) {
 }
 
 int generate_random_data(void* dest, size_t dest_len) {
-    size_t len = 0;
-    int fd;
-
-    fd = open("/dev/urandom", O_RDONLY);
-    if (fd == -1)
+    if (init_random() != 0)
         return -1;
 
-    while (len < dest_len) {
-        ssize_t rv = safe_read(fd, dest, dest_len);
-
-        if (rv < 0) {
-            close(fd);
-            return -1;
-        }
-
-        len += rv;
-    }
-
-    close(fd);
-    return 0;
+    int ret = mbedtls_ctr_drbg_random(&ctr_drbg_ctx, reinterpret_cast<unsigned char*>(dest), dest_len);
+    return (ret == 0) ? 0 : -1;
 }
 
 const char* choose_first_ipv6_interface() {
