@@ -23,7 +23,7 @@
 #include "iso15118_extensionsImplStub.hpp"
 
 #include <connection.hpp>
-#include <tls.hpp>
+#include <mbedtls/ssl.h>
 #include <v2g_ctx.hpp>
 
 using namespace std::chrono_literals;
@@ -123,7 +123,7 @@ struct EvseSecurity : public module::stub::evse_securityIntfStub {
 int main(int argc, char** argv) {
     parse_options(argc, argv);
 
-    tls::Server tls_server;
+    mbedtls_ssl_context tls_server;
     module::stub::ModuleAdapterStub adapter;
     module::stub::ISO15118_chargerImplStub charger(adapter);
     EvseSecurity security(adapter);
@@ -162,7 +162,7 @@ int main(int argc, char** argv) {
         }
 
         stop.join();
-        tls::ServerConnection::wait_all_closed();
+
 
         // wait for v2g_ctx_start_events thread to stop
         std::this_thread::sleep_for(2s);

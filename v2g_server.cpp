@@ -8,6 +8,7 @@
 #include <inttypes.h>
 #include <string.h>
 #include <unistd.h>
+#include "mbedtls_util.hpp"
 
 #include <cbv2g/app_handshake/appHand_Decoder.h>
 #include <cbv2g/app_handshake/appHand_Encoder.h>
@@ -116,7 +117,7 @@ static void publish_var_V2G_Message(v2g_connection* conn, bool is_req) {
 
     std::string EXI_Base64;
 
-    EXI_Base64 = openssl::base64_encode(conn->buffer, conn->payload_len + V2GTP_HEADER_LENGTH);
+    EXI_Base64 = mbedtls_util::base64_encode(conn->buffer, conn->payload_len + V2GTP_HEADER_LENGTH);
     if (EXI_Base64.size() == 0) {
         dlog(DLOG_LEVEL_WARNING, "Unable to base64 encode EXI buffer");
     }

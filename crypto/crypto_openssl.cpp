@@ -5,6 +5,7 @@
 #include <cassert>
 
 #include "crypto_openssl.hpp"
+#include "../mbedtls_util.hpp"
 #include "iso_server.hpp"
 #include "log.hpp"
 
@@ -14,21 +15,15 @@
 #include <cbv2g/iso_2/iso2_msgDefDecoder.h>
 #include <cbv2g/iso_2/iso2_msgDefEncoder.h>
 
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/pem.h>
-#include <openssl/store.h>
-#include <openssl/x509.h>
 
-namespace crypto ::openssl {
-using ::openssl::bn_const_t;
-using ::openssl::bn_t;
-using ::openssl::log_error;
-using ::openssl::sha_256;
-using ::openssl::sha_256_digest_t;
-using ::openssl::verify;
+#include <mbedtls/pk.h>
 
-bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, EVP_PKEY* pkey,
+namespace crypto ::mbedtls {
+using mbedtls_util::sha_256;
+using mbedtls_util::sha_256_digest_t;
+using mbedtls_util::verify;
+
+bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedtls_pk_context* pkey,
                           struct iso2_exiFragment* iso2_exi_fragment) {
     assert(pkey != nullptr);
     assert(iso2_signature != nullptr);
@@ -112,7 +107,7 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, EVP_P
 
     if (bRes) {
         /* Validate the ecdsa signature using the public key */
-        if (signature_len != ::openssl::signature_size) {
+        if (signature_len != mbedtls_util::signature_size) {
             dlog(DLOG_LEVEL_ERROR, "Signature len is invalid (%i)", signature_len);
             bRes = false;
         }
@@ -127,29 +122,29 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, EVP_P
     return bRes;
 }
 
-bool load_contract_root_cert(::openssl::certificate_list& trust_anchors, const char* V2G_file_path,
+bool load_contract_root_cert(mbedtls_util::certificate_list& trust_anchors, const char* V2G_file_path,
                              const char* MO_file_path) {
     trust_anchors.clear();
 
-    auto mo_certs = ::openssl::load_certificates(MO_file_path);
+    auto mo_certs = mbedtls_util::load_certificates(MO_file_path);
     trust_anchors = std::move(mo_certs);
 
-    auto v2g_certs = ::openssl::load_certificates(V2G_file_path);
+    auto v2g_certs = mbedtls_util::load_certificates(V2G_file_path);
     trust_anchors.insert(trust_anchors.end(), std::make_move_iterator(v2g_certs.begin()),
                          std::make_move_iterator(v2g_certs.end()));
 
     if (trust_anchors.empty()) {
-        log_error("Unable to load any MO or V2G root(s)");
+        dlog(DLOG_LEVEL_ERROR, "Unable to load any MO or V2G root(s)");
     }
 
     return !trust_anchors.empty();
 }
 
-int load_certificate(::openssl::certificate_list* chain, const std::uint8_t* bytes, std::uint16_t bytesLen) {
+int load_certificate(mbedtls_util::certificate_list* chain, const std::uint8_t* bytes, std::uint16_t bytesLen) {
     assert(chain != nullptr);
     int result{-1};
 
-    auto tmp_cert = ::openssl::der_to_certificate(bytes, bytesLen);
+    auto tmp_cert = mbedtls_util::der_to_certificate(bytes, bytesLen);
     if (tmp_cert != nullptr) {
         chain->push_back(std::move(tmp_cert));
         result = 0;
@@ -158,14 +153,14 @@ int load_certificate(::openssl::certificate_list* chain, const std::uint8_t* byt
     return result;
 }
 
-int parse_contract_certificate(::openssl::certificate_ptr& crt, const std::uint8_t* buf, std::size_t buflen) {
-    crt = ::openssl::der_to_certificate(buf, buflen);
+int parse_contract_certificate(mbedtls_util::certificate_ptr& crt, const std::uint8_t* buf, std::size_t buflen) {
+    crt = mbedtls_util::der_to_certificate(buf, buflen);
     return (crt == nullptr) ? -1 : 0;
 }
 
-std::string getEmaidFromContractCert(const ::openssl::certificate_ptr& crt) {
+std::string getEmaidFromContractCert(const mbedtls_util::certificate_ptr& crt) {
     std::string cert_emaid;
-    const auto subject = ::openssl::certificate_subject(crt.get());
+    const auto subject = mbedtls_util::certificate_subject(crt.get());
     if (auto itt = subject.find("CN"); itt != subject.end()) {
         cert_emaid = itt->second;
     }
@@ -173,12 +168,12 @@ std::string getEmaidFromContractCert(const ::openssl::certificate_ptr& crt) {
     return cert_emaid;
 }
 
-std::string chain_to_pem(const ::openssl::certificate_ptr& cert, const ::openssl::certificate_list* chain) {
+std::string chain_to_pem(const mbedtls_util::certificate_ptr& cert, const mbedtls_util::certificate_list* chain) {
     assert(chain != nullptr);
 
-    std::string contract_cert_chain_pem(::openssl::certificate_to_pem(cert.get()));
+    std::string contract_cert_chain_pem(mbedtls_util::certificate_to_pem(cert.get()));
     for (const auto& crt : *chain) {
-        const auto pem = ::openssl::certificate_to_pem(crt.get());
+        const auto pem = mbedtls_util::certificate_to_pem(crt.get());
         if (pem.empty()) {
             dlog(DLOG_LEVEL_ERROR, "Unable to encode certificate chain");
             break;
@@ -189,21 +184,21 @@ std::string chain_to_pem(const ::openssl::certificate_ptr& cert, const ::openssl
     return contract_cert_chain_pem;
 }
 
-verify_result_t verify_certificate(const ::openssl::certificate_ptr& cert, const ::openssl::certificate_list* chain,
+verify_result_t verify_certificate(const mbedtls_util::certificate_ptr& cert, const mbedtls_util::certificate_list* chain,
                                    const char* v2g_root_cert_path, const char* mo_root_cert_path,
                                    bool /* debugMode */) {
     assert(chain != nullptr);
 
     verify_result_t result{verify_result_t::Verified};
-    ::openssl::certificate_list trust_anchors;
+    mbedtls_util::certificate_list trust_anchors;
 
     if (!load_contract_root_cert(trust_anchors, v2g_root_cert_path, mo_root_cert_path)) {
         result = verify_result_t::NoCertificateAvailable;
     } else {
-        result = ::openssl::verify_certificate(cert.get(), trust_anchors, *chain);
+        result = mbedtls_util::verify_certificate(cert.get(), *chain, trust_anchors);
     }
 
     return result;
 }
 
-} // namespace crypto::openssl
+} // namespace crypto::mbedtls
