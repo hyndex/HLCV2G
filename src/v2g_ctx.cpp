@@ -28,8 +28,8 @@ v2g_context::v2g_context()
       tls_key_logging(false), basic_config{0}, last_v2g_msg(V2G_UNKNOWN_MSG), current_v2g_msg(V2G_UNKNOWN_MSG),
       state(0), is_dc_charger(false), debugMode(false), supported_protocols(0), selected_protocol(V2G_UNKNOWN_PROTOCOL),
       intl_emergency_shutdown(false), stop_hlc(false), is_connection_terminated(false),
-      terminate_connection_on_failed_response(false), contactor_is_closed(false), meter_info{}, evse_v2g_data{},
-      session{}, ev_v2g_data{}, hlc_pause_active(false) {
+      terminate_connection_on_failed_response(false), contactor_is_closed(false), cp_state(CP_STATE_A),
+      meter_info{}, evse_v2g_data{}, session{}, ev_v2g_data{}, hlc_pause_active(false) {
     frt_mutex_init(&mqtt_lock);
     frt_cond_init(&mqtt_cond);
 }
@@ -198,6 +198,7 @@ void v2g_ctx_init_charging_values(struct v2g_context* const ctx) {
         init_physical_value(&ctx->evse_v2g_data.evse_nominal_voltage, iso2_unitSymbolType_V);
         ctx->evse_v2g_data.rcd = (int)0; // 0 if RCD has not detected an error
         ctx->contactor_is_closed = false;
+        ctx->cp_state = CP_STATE_A;
 
         ctx->evse_v2g_data.payment_option_list[0] = iso2_paymentOptionType_ExternalPayment;
         ctx->evse_v2g_data.payment_option_list_len = (uint8_t)1; // One option must be set
@@ -249,6 +250,7 @@ void v2g_ctx_init_charging_values(struct v2g_context* const ctx) {
     // AC paramter
     ctx->evse_v2g_data.rcd = (int)0; // 0 if RCD has not detected an error
     ctx->contactor_is_closed = false;
+    ctx->cp_state = CP_STATE_A;
     ctx->evse_v2g_data.receipt_required = (int)0;
 
     // Specific SAE J2847 bidi values

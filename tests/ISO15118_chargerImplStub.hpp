@@ -8,6 +8,8 @@
 #include <memory>
 
 #include "ModuleAdapterStub.hpp"
+#include <v2g.hpp>
+#include <freertos_sync.hpp>
 
 #include <generated/interfaces/ISO15118_charger/Implementation.hpp>
 
@@ -81,6 +83,13 @@ struct ISO15118_chargerImplStub : public ISO15118_chargerImplBase {
     }
     virtual void handle_reset_error() {
         std::cout << "ISO15118_chargerImplBase::handle_reset_error called" << std::endl;
+    }
+
+    void set_cp_state(cp_state state) {
+        frt_mutex_lock(&v2g_ctx->mqtt_lock);
+        v2g_ctx->cp_state = state;
+        frt_cond_signal(&v2g_ctx->mqtt_cond);
+        frt_mutex_unlock(&v2g_ctx->mqtt_lock);
     }
 };
 
