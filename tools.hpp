@@ -27,6 +27,12 @@
 #define ROUND_UP_ELEMENTS(N, S) (((N) + (S)-1) / (S))
 #endif
 
+#ifdef ESP_PLATFORM
+#ifndef CONFIG_V2G_IPV6_NETIF
+#define CONFIG_V2G_IPV6_NETIF "WIFI_STA_DEF"
+#endif
+#endif
+
 int generate_random_data(void* dest, size_t dest_len);
 
 enum Addr6Type {

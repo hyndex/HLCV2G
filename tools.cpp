@@ -18,6 +18,9 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#ifdef ESP_PLATFORM
+#include "esp_netif.h"
+#endif
 
 ssize_t safe_read(int fd, void* buf, size_t count) {
     for (;;) {
@@ -56,6 +59,14 @@ int generate_random_data(void* dest, size_t dest_len) {
 }
 
 const char* choose_first_ipv6_interface() {
+#ifdef ESP_PLATFORM
+#ifdef CONFIG_V2G_IPV6_NETIF
+    return CONFIG_V2G_IPV6_NETIF;
+#else
+    /* Default to WiFi station interface if nothing configured */
+    return "WIFI_STA_DEF";
+#endif
+#else
     struct ifaddrs *ifaddr, *ifa;
     char buffer[INET6_ADDRSTRLEN];
 
@@ -75,9 +86,46 @@ const char* choose_first_ipv6_interface() {
     }
     dlog(DLOG_LEVEL_ERROR, "No necessary IPv6 link-local address was found!");
     return NULL;
+#endif
 }
 
 int get_interface_ipv6_address(const char* if_name, enum Addr6Type type, struct sockaddr_in6* addr) {
+#ifdef ESP_PLATFORM
+    esp_netif_t* netif = esp_netif_get_handle_from_ifkey(if_name);
+    if (!netif) {
+        dlog(DLOG_LEVEL_ERROR, "esp_netif %s not found", if_name);
+        return -1;
+    }
+
+    esp_ip6_addr_t ip6;
+    esp_err_t err;
+
+    switch (type) {
+    case ADDR6_TYPE_LINKLOCAL:
+        err = esp_netif_get_ip6_linklocal(netif, &ip6);
+        break;
+    case ADDR6_TYPE_GLOBAL:
+        err = esp_netif_get_ip6_global(netif, &ip6);
+        break;
+    default:
+        err = esp_netif_get_ip6_global(netif, &ip6);
+        if (err != ESP_OK) {
+            err = esp_netif_get_ip6_linklocal(netif, &ip6);
+        }
+        break;
+    }
+
+    if (err != ESP_OK) {
+        dlog(DLOG_LEVEL_ERROR, "Failed to get IPv6 address for %s", if_name);
+        return -1;
+    }
+
+    memset(addr, 0, sizeof(*addr));
+    addr->sin6_family = AF_INET6;
+    memcpy(&addr->sin6_addr, ip6.addr, sizeof(ip6.addr));
+    addr->sin6_scope_id = ip6.zone ? ip6.zone : esp_netif_get_netif_impl_index(netif);
+    return 0;
+#else
     struct ifaddrs *ifaddr, *ifa;
     int rv = -1;
 
@@ -126,6 +174,7 @@ int get_interface_ipv6_address(const char* if_name, enum Addr6Type type, struct 
 out:
     freeifaddrs(ifaddr);
     return rv;
+#endif
 }
 
 #define NSEC_PER_SEC 1000000000L
