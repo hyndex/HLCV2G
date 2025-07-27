@@ -39,8 +39,13 @@ tls_connection.cpp.
   `[fe80::ae91:a1ff:fec9:a947%3]:64109`
 - supports multiple connections
 - gracefully terminates after 80 seconds
-- `valgrind` can be used to check memory allocations
-  (has some leaks - possibly in v2g_ctx_start_events thread)
+- `valgrind` can be used to check memory allocations.  Use `v2g_ctx_free()` to
+  shut down which signals all tasks to exit and joins the event thread.
+
+### Shutdown procedure
+
+1. Set `ctx->shutdown` to `true` to signal all running loops.
+2. Call `v2g_ctx_free(ctx)` to close sockets and join background threads.
 - requires client certificate
 - s_client echos back what is typed with a delay since V2G has a long timeout
 
