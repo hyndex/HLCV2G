@@ -73,4 +73,85 @@ TEST_F(IsoServerTest, CertificateUpdateDecodeFail) {
     EXPECT_EQ(exi_out.V2G_Message.Body.CertificateUpdateRes.ResponseCode, iso2_responseCodeType_FAILED);
 }
 
+TEST_F(IsoServerTest, SessionResumeSuccess) {
+    // initial session setup
+    exi_out.V2G_Message.Body.SessionSetupRes_isUsed = 1u;
+    init_iso2_SessionSetupResType(&exi_out.V2G_Message.Body.SessionSetupRes);
+    exi_in.V2G_Message.Body.SessionSetupReq_isUsed = 1u;
+    init_iso2_SessionSetupReqType(&exi_in.V2G_Message.Body.SessionSetupReq);
+    exi_in.V2G_Message.Header.SessionID.bytesLen = iso2_sessionIDType_BYTES_SIZE;
+    memset(exi_in.V2G_Message.Header.SessionID.bytes, 0, iso2_sessionIDType_BYTES_SIZE);
+
+    auto ev = handle_iso_session_setup(&conn);
+    EXPECT_EQ(ev, V2G_EVENT_NO_EVENT);
+    EXPECT_EQ(exi_out.V2G_Message.Body.SessionSetupRes.ResponseCode,
+              iso2_responseCodeType_OK_NewSessionEstablished);
+    uint64_t session_id = ctx.evse_v2g_data.session_id;
+
+    // EV requests pause
+    exi_out.V2G_Message.Body.SessionStopRes_isUsed = 1u;
+    init_iso2_SessionStopResType(&exi_out.V2G_Message.Body.SessionStopRes);
+    exi_in.V2G_Message.Body.SessionStopReq_isUsed = 1u;
+    init_iso2_SessionStopReqType(&exi_in.V2G_Message.Body.SessionStopReq);
+    exi_in.V2G_Message.Header.SessionID.bytesLen = iso2_sessionIDType_BYTES_SIZE;
+    memcpy(exi_in.V2G_Message.Header.SessionID.bytes, &session_id, iso2_sessionIDType_BYTES_SIZE);
+    exi_in.V2G_Message.Body.SessionStopReq.ChargingSession = iso2_chargingSessionType_Pause;
+    handle_iso_session_stop(&conn);
+
+    // connection teardown while paused
+    v2g_ctx_init_charging_session(&ctx, true);
+
+    // resume session
+    exi_out.V2G_Message.Body.SessionSetupRes_isUsed = 1u;
+    init_iso2_SessionSetupResType(&exi_out.V2G_Message.Body.SessionSetupRes);
+    exi_in.V2G_Message.Body.SessionSetupReq_isUsed = 1u;
+    init_iso2_SessionSetupReqType(&exi_in.V2G_Message.Body.SessionSetupReq);
+    exi_in.V2G_Message.Header.SessionID.bytesLen = iso2_sessionIDType_BYTES_SIZE;
+    memcpy(exi_in.V2G_Message.Header.SessionID.bytes, &session_id, iso2_sessionIDType_BYTES_SIZE);
+
+    ev = handle_iso_session_setup(&conn);
+    EXPECT_EQ(ev, V2G_EVENT_NO_EVENT);
+    EXPECT_EQ(exi_out.V2G_Message.Body.SessionSetupRes.ResponseCode,
+              iso2_responseCodeType_OK_OldSessionJoined);
+    EXPECT_FALSE(ctx.hlc_pause_active);
+}
+
+TEST_F(IsoServerTest, SessionResumeUnknown) {
+    // create and terminate session
+    exi_out.V2G_Message.Body.SessionSetupRes_isUsed = 1u;
+    init_iso2_SessionSetupResType(&exi_out.V2G_Message.Body.SessionSetupRes);
+    exi_in.V2G_Message.Body.SessionSetupReq_isUsed = 1u;
+    init_iso2_SessionSetupReqType(&exi_in.V2G_Message.Body.SessionSetupReq);
+    exi_in.V2G_Message.Header.SessionID.bytesLen = iso2_sessionIDType_BYTES_SIZE;
+    memset(exi_in.V2G_Message.Header.SessionID.bytes, 0, iso2_sessionIDType_BYTES_SIZE);
+
+    handle_iso_session_setup(&conn);
+    uint64_t old_id = ctx.evse_v2g_data.session_id;
+
+    exi_out.V2G_Message.Body.SessionStopRes_isUsed = 1u;
+    init_iso2_SessionStopResType(&exi_out.V2G_Message.Body.SessionStopRes);
+    exi_in.V2G_Message.Body.SessionStopReq_isUsed = 1u;
+    init_iso2_SessionStopReqType(&exi_in.V2G_Message.Body.SessionStopReq);
+    exi_in.V2G_Message.Header.SessionID.bytesLen = iso2_sessionIDType_BYTES_SIZE;
+    memcpy(exi_in.V2G_Message.Header.SessionID.bytes, &old_id, iso2_sessionIDType_BYTES_SIZE);
+    exi_in.V2G_Message.Body.SessionStopReq.ChargingSession = iso2_chargingSessionType_Terminate;
+    handle_iso_session_stop(&conn);
+
+    // connection teardown after termination
+    v2g_ctx_init_charging_session(&ctx, true);
+
+    // try to resume using old session id
+    exi_out.V2G_Message.Body.SessionSetupRes_isUsed = 1u;
+    init_iso2_SessionSetupResType(&exi_out.V2G_Message.Body.SessionSetupRes);
+    exi_in.V2G_Message.Body.SessionSetupReq_isUsed = 1u;
+    init_iso2_SessionSetupReqType(&exi_in.V2G_Message.Body.SessionSetupReq);
+    exi_in.V2G_Message.Header.SessionID.bytesLen = iso2_sessionIDType_BYTES_SIZE;
+    memcpy(exi_in.V2G_Message.Header.SessionID.bytes, &old_id, iso2_sessionIDType_BYTES_SIZE);
+
+    auto ev2 = handle_iso_session_setup(&conn);
+    EXPECT_EQ(ev2, V2G_EVENT_NO_EVENT);
+    EXPECT_EQ(exi_out.V2G_Message.Body.SessionSetupRes.ResponseCode,
+              iso2_responseCodeType_FAILED_UnknownSession);
+}
+
 } // namespace
