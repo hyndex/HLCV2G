@@ -41,7 +41,7 @@ bool verify(mbedtls_pk_context* key, const uint8_t* r, const uint8_t* s, const s
 
 certificate_ptr der_to_certificate(const uint8_t* der, size_t len);
 
-certificate_list load_certificates(const char* path);
+certificate_list load_certificates_pem(const char* pem);
 
 std::string certificate_to_pem(const mbedtls_x509_crt* crt);
 

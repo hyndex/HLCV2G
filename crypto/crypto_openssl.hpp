@@ -37,12 +37,12 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
  *        Use the mobility operator certificate if it exists otherwise
  *        the V2G certificate
  * \param contract_root_crt the retrieved trust anchor
- * \param V2G_file_path the file containing the V2G trust anchor (PEM format)
- * \param MO_file_path the file containing the mobility operator trust anchor (PEM format)
+ * \param V2G_pem the V2G trust anchor in PEM format
+ * \param MO_pem the mobility operator trust anchor in PEM format
  * \return true when a certificate was found
  */
-bool load_contract_root_cert(mbedtls_util::certificate_list& trust_anchors, const char* V2G_file_path,
-                             const char* MO_file_path);
+bool load_contract_root_cert(mbedtls_util::certificate_list& trust_anchors, const char* V2G_pem,
+                             const char* MO_pem);
 
 /**
  * \brief clear certificate and public key from previous connection
@@ -89,13 +89,13 @@ std::string chain_to_pem(const mbedtls_util::certificate_ptr& cert, const mbedtl
  * \brief verify certification path of the contract certificate through to a trust anchor
  * \param contract_crt (single certificate or chain with the contract certificate as the first item)
  * \param chain intermediate certificates (may be nullptr)
- * \param v2g_root_cert_path V2G trust anchor file name
- * \param mo_root_cert_path mobility operator trust anchor file name
+ * \param v2g_root_pem V2G trust anchor PEM string
+ * \param mo_root_pem mobility operator trust anchor PEM string
  * \param debugMode additional information on verification failures
  * \result a subset of possible verification failures where known or 'verified' on success
  */
 verify_result_t verify_certificate(const mbedtls_util::certificate_ptr& cert, const mbedtls_util::certificate_list* chain,
-                                   const char* v2g_root_cert_path, const char* mo_root_cert_path, bool debugMode);
+                                   const char* v2g_root_pem, const char* mo_root_pem, bool debugMode);
 
 } // namespace crypto::mbedtls
 

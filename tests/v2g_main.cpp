@@ -20,6 +20,7 @@
 #include "ISO15118_chargerImplStub.hpp"
 #include "ModuleAdapterStub.hpp"
 #include "evse_securityIntfStub.hpp"
+#include "../crypto/root_certs.hpp"
 #include "iso15118_extensionsImplStub.hpp"
 
 #include <connection.hpp>
@@ -85,7 +86,10 @@ struct EvseSecurity : public module::stub::evse_securityIntfStub {
     }
 
     Result get_verify_file(const Requirement& req, const Parameters& args) override {
-        return "client_root_cert.pem";
+        if (args.size() > 0) {
+            return v2g_root_cert_pem;
+        }
+        return mo_root_cert_pem;
     }
 
     virtual Result get_leaf_certificate_info(const Requirement& req, const Parameters& args) override {

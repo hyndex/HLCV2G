@@ -917,13 +917,13 @@ static enum v2g_event handle_iso_payment_details(struct v2g_connection* conn) {
 
         /* Only if certificate chain verification should be done locally by the EVSE */
         if (conn->ctx->session.verify_contract_cert_chain == true) {
-            std::string v2g_root_cert_path =
+            std::string v2g_root_pem =
                 conn->ctx->r_security->call_get_verify_file(types::evse_security::CaCertificateType::V2G);
-            std::string mo_root_cert_path =
+            std::string mo_root_pem =
                 conn->ctx->r_security->call_get_verify_file(types::evse_security::CaCertificateType::MO);
 
-            crypto::verify_result_t vRes = verify_certificate(contract_crt, &chain, v2g_root_cert_path.c_str(),
-                                                              mo_root_cert_path.c_str(), conn->ctx->debugMode);
+            crypto::verify_result_t vRes = verify_certificate(contract_crt, &chain, v2g_root_pem.c_str(),
+                                                              mo_root_pem.c_str(), conn->ctx->debugMode);
 
             err = -1;
             bool forward_contract = false;
