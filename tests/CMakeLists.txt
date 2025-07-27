@@ -121,6 +121,7 @@ target_sources(${DIN_SERVER_NAME} PRIVATE
     din_server_test.cpp
     log.cpp
     ../din_server.cpp
+    ../utils/session_utils.cpp
     ../tools.cpp # TODO: Maybe mock this one
 )
 
@@ -236,6 +237,7 @@ target_compile_definitions(${ISO_SERVER_TEST_NAME} PRIVATE
 target_sources(${ISO_SERVER_TEST_NAME} PRIVATE
     iso_server_test.cpp
     log.cpp
+    ../utils/session_utils.cpp
     ../v2g_ctx.cpp
     ../tools.cpp
 )
