@@ -22,10 +22,6 @@ void ISO15118_chargerImpl::init() {
         return;
     }
 
-    /* Configure if_name and auth_mode */
-    v2g_ctx->if_name = mod->config.device.data();
-    ESP_LOGD(TAG, "if_name %s", v2g_ctx->if_name);
-
     /* Configure hlc_protocols */
     if (mod->config.supported_DIN70121 == true) {
         v2g_ctx->supported_protocols |= (1 << V2G_PROTO_DIN70121);

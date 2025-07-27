@@ -52,3 +52,12 @@ is required. When building via PlatformIO, the `extraScript` in
 builds libcbv2g for the ESP32 toolchain. The CMake build simply adds the
 library with ``add_subdirectory(lib/libcbv2g)`` and links the
 ``cbv2g::`` targets.
+
+Configuration
+=============
+
+The network interface used for High Level Communication (HLC) can be
+configured through the module parameter ``device``.  When starting the
+module, set ``device`` to the desired interface name, e.g. ``eth0`` or
+``auto`` to automatically select the first IPv6 capable interface.
+This value is passed to ``v2g_ctx_create`` during initialisation.

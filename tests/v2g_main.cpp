@@ -133,13 +133,12 @@ int main(int argc, char** argv) {
     EvseSecurity security(adapter);
     module::stub::iso15118_extensionsImplStub extensions;
 
-    auto* ctx = v2g_ctx_create(&charger, &extensions, &security);
+    auto* ctx = v2g_ctx_create(&charger, &extensions, &security, interface);
 
     if (ctx == nullptr) {
         std::cerr << "failed to create context" << std::endl;
     } else {
         ctx->tls_server = &tls_server;
-        ctx->if_name = interface;
         ctx->tls_security = TLS_SECURITY_FORCE;
         ctx->is_connection_terminated = false;
 
