@@ -4,6 +4,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <new>
 #include <dirent.h>
 #include <errno.h>
 #include <math.h>
@@ -17,6 +18,27 @@
 static const char* TAG = "v2g_ctx";
 
 #include <cbv2g/iso_2/iso2_msgDefDatatypes.h>
+
+v2g_context::v2g_context()
+    : shutdown(false), r_security(nullptr), p_charger(nullptr), p_extensions(nullptr), event_thread(nullptr),
+      if_name(nullptr), local_tcp_addr(nullptr), local_tls_addr(nullptr), tls_key_logging_path(""),
+      network_read_timeout(0), network_read_timeout_tls(0), tls_security(TLS_SECURITY_PROHIBIT), sdp_socket(0),
+      tcp_socket(0), udp_port(0), udp_socket(0), tcp_thread(nullptr), tls_socket{-1}, tls_server(nullptr),
+      tls_key_logging(false), basic_config{0}, last_v2g_msg(V2G_UNKNOWN_MSG), current_v2g_msg(V2G_UNKNOWN_MSG),
+      state(0), is_dc_charger(false), debugMode(false), supported_protocols(0), selected_protocol(V2G_UNKNOWN_PROTOCOL),
+      intl_emergency_shutdown(false), stop_hlc(false), is_connection_terminated(false),
+      terminate_connection_on_failed_response(false), contactor_is_closed(false), meter_info{}, evse_v2g_data{},
+      session{}, ev_v2g_data{}, hlc_pause_active(false) {
+    frt_mutex_init(&mqtt_lock);
+    frt_cond_init(&mqtt_cond);
+}
+
+v2g_context::~v2g_context() {
+    frt_cond_destroy(&mqtt_cond);
+    frt_mutex_destroy(&mqtt_lock);
+    free(local_tls_addr);
+    free(local_tcp_addr);
+}
 
 void init_physical_value(struct iso2_PhysicalValueType* const physicalValue, iso2_unitSymbolType unit) {
     physicalValue->Multiplier = 0;
@@ -255,9 +277,7 @@ struct v2g_context* v2g_ctx_create(ISO15118_chargerImplBase* p_chargerImplBase,
                                    iso15118_extensionsImplBase* p_extensions, evse_securityIntf* r_security) {
     struct v2g_context* ctx;
 
-    // TODO There are c++ objects within v2g_context and calloc doesn't call initialisers.
-    //      free() will not call destructors
-    ctx = static_cast<v2g_context*>(calloc(1, sizeof(*ctx)));
+    ctx = new (std::nothrow) v2g_context();
     if (!ctx)
         return NULL;
 
@@ -289,9 +309,6 @@ struct v2g_context* v2g_ctx_create(ISO15118_chargerImplBase* p_chargerImplBase,
     ctx->tls_key_logging = false;
     ctx->debugMode = false;
 
-    frt_mutex_init(&ctx->mqtt_lock);
-    frt_cond_init(&ctx->mqtt_cond);
-
     if (v2g_ctx_start_events(ctx) != 0)
         goto free_out;
 
@@ -300,22 +317,12 @@ struct v2g_context* v2g_ctx_create(ISO15118_chargerImplBase* p_chargerImplBase,
     return ctx;
 
 free_out:
-    free(ctx->local_tls_addr);
-    free(ctx->local_tcp_addr);
-    free(ctx);
+    delete ctx;
     return NULL;
 }
 
 void v2g_ctx_free(struct v2g_context* ctx) {
-
-    frt_cond_destroy(&ctx->mqtt_cond);
-    frt_mutex_destroy(&ctx->mqtt_lock);
-
-    free(ctx->local_tls_addr);
-    ctx->local_tls_addr = NULL;
-    free(ctx->local_tcp_addr);
-    ctx->local_tcp_addr = NULL;
-    free(ctx);
+    delete ctx;
 }
 
 void publish_dc_ev_maximum_limits(struct v2g_context* ctx, const float& v2g_dc_ev_max_current_limit,
