@@ -47,6 +47,7 @@ target_sources(${MODULE_NAME}
         "connection/connection.cpp"
         "iso_server.cpp"
         "din_server.cpp"
+        "utils/session_utils.cpp"
         "esp_log.c"
         "sdp.cpp"
         "tools.cpp"

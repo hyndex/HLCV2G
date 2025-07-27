@@ -154,4 +154,31 @@ TEST_F(IsoServerTest, SessionResumeUnknown) {
               iso2_responseCodeType_FAILED_UnknownSession);
 }
 
+TEST_F(IsoServerTest, ValidateResponseCodeUnknownSession) {
+    iso2_responseCodeType rc = iso2_responseCodeType_OK;
+    ctx.is_dc_charger = false;
+    ctx.state = static_cast<int>(iso_ac_state_id::WAIT_FOR_AUTHORIZATION);
+    ctx.current_v2g_msg = V2G_AUTHORIZATION_MSG;
+    ctx.evse_v2g_data.session_id = 1;
+    ctx.ev_v2g_data.received_session_id = 2;
+    ctx.terminate_connection_on_failed_response = false;
+
+    auto ev = iso_validate_response_code(&rc, &conn);
+    EXPECT_EQ(rc, iso2_responseCodeType_FAILED_UnknownSession);
+    EXPECT_EQ(ev, V2G_EVENT_NO_EVENT);
+}
+
+TEST_F(IsoServerTest, ValidateResponseCodeSendTerminate) {
+    iso2_responseCodeType rc = iso2_responseCodeType_FAILED;
+    ctx.is_dc_charger = false;
+    ctx.state = static_cast<int>(iso_ac_state_id::WAIT_FOR_SESSIONSETUP);
+    ctx.current_v2g_msg = V2G_SESSION_SETUP_MSG;
+    ctx.evse_v2g_data.session_id = 0;
+    ctx.ev_v2g_data.received_session_id = 0;
+    ctx.terminate_connection_on_failed_response = true;
+
+    auto ev = iso_validate_response_code(&rc, &conn);
+    EXPECT_EQ(ev, V2G_EVENT_SEND_AND_TERMINATE);
+}
+
 } // namespace

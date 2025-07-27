@@ -12,6 +12,7 @@
 #include "tools.hpp"
 #include "v2g_ctx.hpp"
 #include "v2g_server.hpp"
+#include "utils/session_utils.hpp"
 
 static const char* TAG = "din_server";
 
@@ -100,15 +101,9 @@ v2g_event din_validate_response_code(din_responseCodeType* const din_response_co
     response_code_tmp = din_validate_state(conn->ctx->state, conn->ctx->current_v2g_msg);
     *din_response_code = (response_code_tmp >= din_responseCodeType_FAILED) ? response_code_tmp : *din_response_code;
 
-    /* [V2G-DC-391]: check whether the session id matches the expected one of the active session */
-    *din_response_code = ((conn->ctx->current_v2g_msg != V2G_SESSION_SETUP_MSG) &&
-                          (conn->ctx->evse_v2g_data.session_id != conn->ctx->ev_v2g_data.received_session_id))
-                             ? din_responseCodeType_FAILED_UnknownSession
-                             : *din_response_code;
-
-    if ((conn->ctx->terminate_connection_on_failed_response == true) &&
-        (*din_response_code >= din_responseCodeType_FAILED)) {
-        nextEvent = V2G_EVENT_SEND_AND_TERMINATE; // [V2G-DC-665]
+    v2g_event session_event = utils::check_session_and_termination(din_response_code, conn);
+    if (session_event != V2G_EVENT_NO_EVENT) {
+        nextEvent = session_event; // [V2G-DC-665]
     }
 
     /* log failed response code message */
