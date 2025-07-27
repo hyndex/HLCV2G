@@ -1,8 +1,14 @@
 Import("env")
 import os, subprocess, shutil
 
-# 1) Locate everything by PROJECT_DIR
-PROJ_DIR = env["PROJECT_DIR"]
+# 1) Locate everything relative to this script
+# When building via ``platformio ci`` PlatformIO copies the library
+# into a temporary directory and sets ``PROJECT_DIR`` to that location.
+# We want to operate on the original repository so we resolve paths
+# relative to this script file instead of ``PROJECT_DIR``.
+# `__file__` is not defined when executed via PlatformIO's SCons `exec`.
+SCRIPT_PATH = globals().get("__file__", os.path.join(os.getcwd(), "pio-build_libcbv2g.py"))
+PROJ_DIR = os.path.abspath(os.path.dirname(SCRIPT_PATH))
 CBV2G    = os.path.join(PROJ_DIR, "lib", "libcbv2g")
 BUILD    = os.path.join(PROJ_DIR, ".pio", "libcbv2g-" + env["PIOENV"])
 
