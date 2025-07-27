@@ -124,14 +124,14 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
     return bRes;
 }
 
-bool load_contract_root_cert(mbedtls_util::certificate_list& trust_anchors, const char* V2G_file_path,
-                             const char* MO_file_path) {
+bool load_contract_root_cert(mbedtls_util::certificate_list& trust_anchors, const char* V2G_pem,
+                             const char* MO_pem) {
     trust_anchors.clear();
 
-    auto mo_certs = mbedtls_util::load_certificates(MO_file_path);
+    auto mo_certs = mbedtls_util::load_certificates_pem(MO_pem);
     trust_anchors = std::move(mo_certs);
 
-    auto v2g_certs = mbedtls_util::load_certificates(V2G_file_path);
+    auto v2g_certs = mbedtls_util::load_certificates_pem(V2G_pem);
     trust_anchors.insert(trust_anchors.end(), std::make_move_iterator(v2g_certs.begin()),
                          std::make_move_iterator(v2g_certs.end()));
 
@@ -187,14 +187,14 @@ std::string chain_to_pem(const mbedtls_util::certificate_ptr& cert, const mbedtl
 }
 
 verify_result_t verify_certificate(const mbedtls_util::certificate_ptr& cert, const mbedtls_util::certificate_list* chain,
-                                   const char* v2g_root_cert_path, const char* mo_root_cert_path,
+                                   const char* v2g_root_pem, const char* mo_root_pem,
                                    bool /* debugMode */) {
     assert(chain != nullptr);
 
     verify_result_t result{verify_result_t::Verified};
     mbedtls_util::certificate_list trust_anchors;
 
-    if (!load_contract_root_cert(trust_anchors, v2g_root_cert_path, mo_root_cert_path)) {
+    if (!load_contract_root_cert(trust_anchors, v2g_root_pem, mo_root_pem)) {
         result = verify_result_t::NoCertificateAvailable;
     } else {
         result = mbedtls_util::verify_certificate(cert.get(), *chain, trust_anchors);

@@ -56,14 +56,24 @@ certificate_ptr der_to_certificate(const uint8_t* der, size_t len) {
     return crt;
 }
 
-certificate_list load_certificates(const char* path) {
+certificate_list load_certificates_pem(const char* pem) {
     certificate_list list;
-    if (!path)
+    if (!pem)
         return list;
-    auto crt = std::make_unique<mbedtls_x509_crt>();
-    mbedtls_x509_crt_init(crt.get());
-    if (mbedtls_x509_crt_parse_file(crt.get(), path) == 0)
-        list.push_back(std::move(crt));
+    mbedtls_x509_crt chain;
+    mbedtls_x509_crt_init(&chain);
+    if (mbedtls_x509_crt_parse(&chain, reinterpret_cast<const unsigned char*>(pem), strlen(pem) + 1) != 0) {
+        mbedtls_x509_crt_free(&chain);
+        return list;
+    }
+    for (mbedtls_x509_crt* c = &chain; c != nullptr; c = c->next) {
+        auto crt = std::make_unique<mbedtls_x509_crt>();
+        mbedtls_x509_crt_init(crt.get());
+        if (mbedtls_x509_crt_parse_der(crt.get(), c->raw.p, c->raw.len) == 0) {
+            list.push_back(std::move(crt));
+        }
+    }
+    mbedtls_x509_crt_free(&chain);
     return list;
 }
 

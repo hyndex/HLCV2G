@@ -9,6 +9,7 @@
 #include "ModuleAdapterStub.hpp"
 #include "generated/types/evse_security.hpp"
 #include "utils/types.hpp"
+#include "../crypto/root_certs.hpp"
 #include <functional>
 #include <generated/interfaces/evse_security/Interface.hpp>
 #include <optional>
@@ -44,7 +45,10 @@ public:
 
     virtual Result get_verify_file(const Requirement& req, const Parameters& args) {
         std::cout << "evse_securityIntf::get_verify_file called" << std::endl;
-        return "";
+        if (args.size() > 0) {
+            return v2g_root_cert_pem;
+        }
+        return mo_root_cert_pem;
     }
 
     virtual Result get_leaf_certificate_info(const Requirement& req, const Parameters& args) {
