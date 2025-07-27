@@ -24,6 +24,7 @@
 #include <string>
 #include <sys/socket.h>
 #include <time.h>
+#include "freertos_shim.hpp"
 #include <unistd.h>
 
 #define DEFAULT_SOCKET_BACKLOG        3
@@ -181,7 +182,7 @@ int connection_init(struct v2g_context* v2g_ctx) {
             v2g_ctx->tcp_socket = connection_create_socket(v2g_ctx->local_tcp_addr);
             if (v2g_ctx->tcp_socket < 0) {
                 /* retry until interface is ready */
-                sleep(1);
+                vTaskDelay(1000);
                 continue;
             }
             if (inet_ntop(AF_INET6, &v2g_ctx->local_tcp_addr->sin6_addr, buffer, sizeof(buffer)) != nullptr) {
@@ -208,7 +209,7 @@ int connection_init(struct v2g_context* v2g_ctx) {
                     close(v2g_ctx->tcp_socket);
                 }
                 /* retry until interface is ready */
-                sleep(1);
+                vTaskDelay(1000);
                 continue;
             }
 
@@ -395,7 +396,7 @@ void connection_teardown(struct v2g_connection* conn) {
 /**
  * This is the 'main' function of a thread, which handles a TCP connection.
  */
-static void* connection_handle_tcp(void* data) {
+static void connection_handle_tcp(void* data) {
     struct v2g_connection* conn = static_cast<struct v2g_connection*>(data);
     int rv = 0;
 
@@ -416,14 +417,14 @@ static void* connection_handle_tcp(void* data) {
     /* tear down connection gracefully */
     dlog(DLOG_LEVEL_INFO, "Closing TCP connection");
 
-    std::this_thread::sleep_for(std::chrono::seconds(2));
+    vTaskDelay(2000);
 
     if (shutdown(conn->conn.socket_fd, SHUT_RDWR) == -1) {
         dlog(DLOG_LEVEL_ERROR, "shutdown() failed: %s", strerror(errno));
     }
 
     // Waiting for client closing the connection
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+    vTaskDelay(3000);
 
     if (close(conn->conn.socket_fd) == -1) {
         dlog(DLOG_LEVEL_ERROR, "close() failed: %s", strerror(errno));
@@ -436,24 +437,13 @@ static void* connection_handle_tcp(void* data) {
     }
 
     free(conn);
-
-    return nullptr;
+    vTaskDelete(nullptr);
 }
 
-static void* connection_server(void* data) {
+static void connection_server(void* data) {
     struct v2g_context* ctx = static_cast<v2g_context*>(data);
     struct v2g_connection* conn = NULL;
-    pthread_attr_t attr;
 
-    /* create the thread in detached state so we don't need to join every single one */
-    if (pthread_attr_init(&attr) != 0) {
-        dlog(DLOG_LEVEL_ERROR, "pthread_attr_init failed: %s", strerror(errno));
-        goto thread_exit;
-    }
-    if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) != 0) {
-        dlog(DLOG_LEVEL_ERROR, "pthread_attr_setdetachstate failed: %s", strerror(errno));
-        goto thread_exit;
-    }
 
     while (1) {
         char client_addr[INET6_ADDRSTRLEN];
@@ -492,8 +482,8 @@ static void* connection_server(void* data) {
         // store the port to create a udp socket
         conn->ctx->udp_port = ntohs(addr.sin6_port);
 
-        if (pthread_create(&conn->thread_id, &attr, connection_handle_tcp, conn) != 0) {
-            dlog(DLOG_LEVEL_ERROR, "pthread_create() failed: %s", strerror(errno));
+        if (xTaskCreate(connection_handle_tcp, "conn_tcp", 4096, conn, 5, &conn->thread_id) != pdPASS) {
+            dlog(DLOG_LEVEL_ERROR, "xTaskCreate() failed");
             continue;
         }
 
@@ -501,24 +491,19 @@ static void* connection_server(void* data) {
         conn = NULL;
     }
 
-thread_exit:
-    if (pthread_attr_destroy(&attr) != 0) {
-        dlog(DLOG_LEVEL_ERROR, "pthread_attr_destroy failed: %s", strerror(errno));
-    }
-
     /* clean up if dangling */
     free(conn);
 
-    return NULL;
+    vTaskDelete(nullptr);
 }
 
 int connection_start_servers(struct v2g_context* ctx) {
     int rv, tcp_started = 0;
 
     if (ctx->tcp_socket != -1) {
-        rv = pthread_create(&ctx->tcp_thread, NULL, connection_server, ctx);
-        if (rv != 0) {
-            dlog(DLOG_LEVEL_ERROR, "pthread_create(tcp) failed: %s", strerror(errno));
+        rv = xTaskCreate(connection_server, "tcp_srv", 4096, ctx, 5, &ctx->tcp_thread);
+        if (rv != pdPASS) {
+            dlog(DLOG_LEVEL_ERROR, "xTaskCreate(tcp) failed");
             return -1;
         }
         tcp_started = 1;
@@ -528,10 +513,9 @@ int connection_start_servers(struct v2g_context* ctx) {
         rv = tls::connection_start_server(ctx);
         if (rv != 0) {
             if (tcp_started) {
-                pthread_cancel(ctx->tcp_thread);
-                pthread_join(ctx->tcp_thread, NULL);
+                vTaskDelete(ctx->tcp_thread);
             }
-            dlog(DLOG_LEVEL_ERROR, "pthread_create(tls) failed: %s", strerror(errno));
+            dlog(DLOG_LEVEL_ERROR, "xTaskCreate(tls) failed: %s", strerror(errno));
             return -1;
         }
     }

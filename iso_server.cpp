@@ -16,6 +16,7 @@
 #include <string.h>
 
 #include "crypto/crypto_openssl.hpp"
+#include "freertos_sync.hpp"
 using namespace openssl;
 using namespace crypto::openssl;
 
@@ -1407,15 +1408,15 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
                 while ((rv == 0) && (conn->ctx->contactor_is_closed == false) &&
                        (conn->ctx->intl_emergency_shutdown == false) && (conn->ctx->stop_hlc == false) &&
                        (conn->ctx->is_connection_terminated == false)) {
-                    pthread_mutex_lock(&conn->ctx->mqtt_lock);
-                    rv = pthread_cond_timedwait(&conn->ctx->mqtt_cond, &conn->ctx->mqtt_lock, &ts_abs_timeout);
+                    frt_mutex_lock(&conn->ctx->mqtt_lock);
+                    rv = frt_cond_timedwait(&conn->ctx->mqtt_cond, &conn->ctx->mqtt_lock, &ts_abs_timeout);
                     if (rv == EINTR)
                         rv = 0; /* restart */
                     if (rv == ETIMEDOUT) {
                         dlog(DLOG_LEVEL_ERROR, "timeout while waiting for contactor to close, signaling error");
                         res->ResponseCode = iso2_responseCodeType_FAILED_ContactorError;
                     }
-                    pthread_mutex_unlock(&conn->ctx->mqtt_lock);
+                    frt_mutex_unlock(&conn->ctx->mqtt_lock);
                 }
             }
         }
@@ -1686,8 +1687,8 @@ static enum v2g_event handle_iso_certificate_installation(struct v2g_connection*
     while ((rv == 0) && (conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == true) &&
            (conn->ctx->intl_emergency_shutdown == false) && (conn->ctx->stop_hlc == false) &&
            (conn->ctx->is_connection_terminated == false)) { // [V2G2-917]
-        pthread_mutex_lock(&conn->ctx->mqtt_lock);
-        rv = pthread_cond_timedwait(&conn->ctx->mqtt_cond, &conn->ctx->mqtt_lock, &ts_abs_timeout);
+        frt_mutex_lock(&conn->ctx->mqtt_lock);
+        rv = frt_cond_timedwait(&conn->ctx->mqtt_cond, &conn->ctx->mqtt_lock, &ts_abs_timeout);
         if (rv == EINTR)
             rv = 0; /* restart */
         if (rv == ETIMEDOUT) {
@@ -1695,7 +1696,7 @@ static enum v2g_event handle_iso_certificate_installation(struct v2g_connection*
             conn->ctx->intl_emergency_shutdown = true; // [V2G2-918] Initiating emergency shutdown, response code faild
                                                        // will be set in iso_validate_response_code() function
         }
-        pthread_mutex_unlock(&conn->ctx->mqtt_lock);
+        frt_mutex_unlock(&conn->ctx->mqtt_lock);
     }
 
     if ((conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == false) &&

@@ -11,7 +11,8 @@
 #include <atomic>
 #include <cstdint>
 #include <netinet/in.h>
-#include <pthread.h>
+#include "freertos_shim.hpp"
+#include "freertos_sync.hpp"
 #include <vector>
 
 #include <openssl_util.hpp>
@@ -23,8 +24,6 @@
 #include <cbv2g/din/din_msgDefDatatypes.h>
 #include <cbv2g/iso_2/iso2_msgDefDatatypes.h>
 
-#include <event2/event.h>
-#include <event2/thread.h>
 
 /* timeouts in milliseconds */
 #define V2G_SEQUENCE_TIMEOUT_60S              60000 /* [V2G2-443] et.al. */
@@ -177,8 +176,7 @@ struct v2g_context {
     ISO15118_chargerImplBase* p_charger;
     iso15118_extensionsImplBase* p_extensions;
 
-    struct event_base* event_base;
-    pthread_t event_thread;
+    TaskHandle_t event_thread;
 
     const char* if_name;
     struct sockaddr_in6* local_tcp_addr;
@@ -197,7 +195,7 @@ struct v2g_context {
     int udp_port;
     int udp_socket;
 
-    pthread_t tcp_thread;
+    TaskHandle_t tcp_thread;
 
     struct {
         int fd;
@@ -206,9 +204,8 @@ struct v2g_context {
 
     bool tls_key_logging;
 
-    pthread_mutex_t mqtt_lock;
-    pthread_cond_t mqtt_cond;
-    pthread_condattr_t mqtt_attr;
+    FrtMutex mqtt_lock;
+    FrtCond mqtt_cond;
 
     struct {
         float evse_ac_current_limit; // default is 0
@@ -347,7 +344,7 @@ enum mqtt_dlink_action {
  * High-level abstraction of an incoming TCP/TLS connection on a certain charging port.
  */
 struct v2g_connection {
-    pthread_t thread_id;
+    TaskHandle_t thread_id;
     struct v2g_context* ctx;
 
     bool is_tls_connection;

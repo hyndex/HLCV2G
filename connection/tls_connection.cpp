@@ -77,7 +77,7 @@ void handle_new_connection_cb(tls::Server::ConnectionPtr&& con, struct v2g_conte
         connection_loop.detach();
     } catch (const std::system_error&) {
         // unable to start thread
-        dlog(DLOG_LEVEL_ERROR, "pthread_create() failed: %s", strerror(errno));
+        dlog(DLOG_LEVEL_ERROR, "xTaskCreate() failed: %s", strerror(errno));
         con->shutdown();
     }
 }

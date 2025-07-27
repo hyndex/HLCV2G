@@ -4,6 +4,7 @@
 #include "ISO15118_chargerImpl.hpp"
 #include "log.hpp"
 #include "v2g_ctx.hpp"
+#include "freertos_sync.hpp"
 
 const std::string CERTS_SUB_DIR = "certs"; // relativ path of the certs
 
@@ -235,11 +236,11 @@ void ISO15118_chargerImpl::handle_authorization_response(
 
 void ISO15118_chargerImpl::handle_ac_contactor_closed(bool& status) {
     /* signal changes to possible waiters, according to man page, it never returns an error code */
-    pthread_mutex_lock(&v2g_ctx->mqtt_lock);
+    frt_mutex_lock(&v2g_ctx->mqtt_lock);
     v2g_ctx->contactor_is_closed = status;
-    pthread_cond_signal(&v2g_ctx->mqtt_cond);
+    frt_cond_signal(&v2g_ctx->mqtt_cond);
     /* unlock */
-    pthread_mutex_unlock(&v2g_ctx->mqtt_lock);
+    frt_mutex_unlock(&v2g_ctx->mqtt_lock);
 }
 
 void ISO15118_chargerImpl::handle_dlink_ready(bool& value) {
@@ -407,12 +408,12 @@ void ISO15118_chargerImpl::handle_send_error(types::iso15118::EvseError& error) 
                sizeof(v2g_ctx->evse_v2g_data.evse_status_code));
         break;
     case types::iso15118::EvseError::Error_EmergencyShutdown:
-        /* signal changes to possible waiters, according to man page, it never returns an error code */
-        pthread_mutex_lock(&v2g_ctx->mqtt_lock);
+        /* signal changes to possible waiters */
+        frt_mutex_lock(&v2g_ctx->mqtt_lock);
         v2g_ctx->intl_emergency_shutdown = true;
-        pthread_cond_signal(&v2g_ctx->mqtt_cond);
+        frt_cond_signal(&v2g_ctx->mqtt_cond);
         /* unlock */
-        pthread_mutex_unlock(&v2g_ctx->mqtt_lock);
+        frt_mutex_unlock(&v2g_ctx->mqtt_lock);
         break;
     default:
         break;
