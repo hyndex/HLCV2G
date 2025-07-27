@@ -41,3 +41,14 @@ Schedule Renegotation
 Smart Charging           
 Internet Service         
 =======================  ==================
+
+Bundled libcbv2g
+================
+
+This module ships with the **libcbv2g** sources. Both the PlatformIO build
+and the CMake module automatically compile the library so no manual setup
+is required. When building via PlatformIO, the `extraScript` in
+``library.json`` invokes ``pio-build_libcbv2g.py`` which configures and
+builds libcbv2g for the ESP32 toolchain. The CMake build simply adds the
+library with ``add_subdirectory(lib/libcbv2g)`` and links the
+``cbv2g::`` targets.
