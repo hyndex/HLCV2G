@@ -43,7 +43,7 @@ target_sources(${MODULE_NAME}
         "connection/connection.cpp"
         "iso_server.cpp"
         "din_server.cpp"
-        "log.cpp"
+        "esp_log.c"
         "sdp.cpp"
         "tools.cpp"
         "v2g_ctx.cpp"

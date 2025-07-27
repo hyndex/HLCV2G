@@ -29,8 +29,7 @@ void clear_logs() {
 
 } // namespace module::stub
 
-void dlog_func(const dloglevel_t loglevel, const char* filename, const int linenumber, const char* functionname,
-               const char* format, ...) {
+extern "C" void esp_log_impl(int level, const char* tag, const char* format, ...) {
     va_list ap;
     std::array<char, 256> buffer;
     va_start(ap, format);
@@ -39,7 +38,7 @@ void dlog_func(const dloglevel_t loglevel, const char* filename, const int linen
     if (len > 0) {
         auto s_len = std::min(len, buffer.size());
         std::string event{buffer.data(), s_len};
-        (void)std::fprintf(stderr, "log: %s\n", event.c_str());
-        add_log(loglevel, event);
+        (void)std::fprintf(stderr, "%s: %s\n", tag, event.c_str());
+        add_log(static_cast<dloglevel_t>(level), event);
     }
 }

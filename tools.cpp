@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2023 chargebyte GmbH
 // Copyright (C) 2022-2023 Contributors to EVerest
 #include "tools.hpp"
-#include "log.hpp"
+#include "esp_log.h"
 #include <arpa/inet.h>
 #include <dirent.h>
 #include <errno.h>
@@ -18,6 +18,8 @@
 #include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
+
+static const char* TAG = "tools";
 #include <time.h>
 #include <unistd.h>
 #ifdef ESP_PLATFORM
@@ -96,7 +98,7 @@ const char* choose_first_ipv6_interface() {
             }
         }
     }
-    dlog(DLOG_LEVEL_ERROR, "No necessary IPv6 link-local address was found!");
+    ESP_LOGE(TAG, "No necessary IPv6 link-local address was found!");
     return NULL;
 #endif
 }
@@ -105,7 +107,7 @@ int get_interface_ipv6_address(const char* if_name, enum Addr6Type type, struct 
 #ifdef ESP_PLATFORM
     esp_netif_t* netif = esp_netif_get_handle_from_ifkey(if_name);
     if (!netif) {
-        dlog(DLOG_LEVEL_ERROR, "esp_netif %s not found", if_name);
+        ESP_LOGE(TAG, "esp_netif %s not found", if_name);
         return -1;
     }
 
@@ -128,7 +130,7 @@ int get_interface_ipv6_address(const char* if_name, enum Addr6Type type, struct 
     }
 
     if (err != ESP_OK) {
-        dlog(DLOG_LEVEL_ERROR, "Failed to get IPv6 address for %s", if_name);
+        ESP_LOGE(TAG, "Failed to get IPv6 address for %s", if_name);
         return -1;
     }
 

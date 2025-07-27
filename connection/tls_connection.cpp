@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 #include "tls_connection.hpp"
 #include "connection.hpp"
-#include "log.hpp"
+#include "esp_log.h"
 #include "v2g.hpp"
 #include <mbedtls/ssl.h>
 #include <mbedtls/net_sockets.h>
+
+static const char* TAG = "tls_conn";
 
 namespace tls {
 

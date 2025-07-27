@@ -3,10 +3,17 @@
 
 #pragma once
 
-#include <log.hpp>
-
 #include <string>
 #include <vector>
+
+enum dloglevel_t {
+    DLOG_LEVEL_ALWAYS = 0,
+    DLOG_LEVEL_ERROR,
+    DLOG_LEVEL_WARNING,
+    DLOG_LEVEL_INFO,
+    DLOG_LEVEL_DEBUG,
+    DLOG_LEVEL_TRACE,
+};
 
 namespace module::stub {
 std::vector<std::string>& get_logs(dloglevel_t loglevel);
