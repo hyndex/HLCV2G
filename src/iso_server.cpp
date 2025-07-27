@@ -513,6 +513,35 @@ static bool publish_iso_certificate_installation_exi_req(struct v2g_context* ctx
     return rv;
 }
 
+/*!
+ * \brief publish_iso_certificate_update_exi_req This function publishes the iso_certificate_update_req message to
+ * the MQTT interface. \param AExiBuffer is the exi msg where the V2G EXI msg is stored. \param AExiBufferSize is the
+ * size of the V2G msg. \return Returns \c true if it was successful, otherwise \c false.
+ */
+static bool publish_iso_certificate_update_exi_req(struct v2g_context* ctx, uint8_t* AExiBuffer,
+                                                   size_t AExiBufferSize) {
+    // PnC only
+
+    bool rv = true;
+    types::iso15118::RequestExiStreamSchema certificate_request;
+
+    certificate_request.exi_request = mbedtls_util::base64_encode(AExiBuffer, AExiBufferSize);
+    if (certificate_request.exi_request.size() > MQTT_MAX_PAYLOAD_SIZE) {
+        ESP_LOGE(TAG, "Mqtt payload size exceeded!");
+        return false;
+    }
+    if (certificate_request.exi_request.size() == 0) {
+        ESP_LOGE(TAG, "Unable to encode contract leaf certificate");
+        return false;
+    }
+
+    certificate_request.iso15118_schema_version = ISO_15118_2013_MSG_DEF;
+    certificate_request.certificate_action = types::iso15118::CertificateActionEnum::Update;
+    ctx->p_extensions->publish_iso15118_certificate_request(certificate_request);
+
+    return rv;
+}
+
 //=============================================
 //             Request Handling
 //=============================================
@@ -1651,8 +1680,67 @@ static enum v2g_event handle_iso_metering_receipt(struct v2g_connection* conn) {
  * \return Returns the next V2G-event.
  */
 static enum v2g_event handle_iso_certificate_update(struct v2g_connection* conn) {
-    // TODO: implement CertificateUpdate handling
-    return V2G_EVENT_NO_EVENT;
+    struct iso2_CertificateUpdateResType* res =
+        &conn->exi_out.iso2EXIDocument->V2G_Message.Body.CertificateUpdateRes;
+    enum v2g_event next_event = V2G_EVENT_SEND_AND_TERMINATE;
+    struct timespec ts_abs_timeout;
+    int rv = 0;
+
+    /* Publish the received EV request message to the MQTT interface */
+    if (publish_iso_certificate_update_exi_req(conn->ctx, conn->buffer + V2GTP_HEADER_LENGTH,
+                                               conn->stream.data_size - V2GTP_HEADER_LENGTH) == false) {
+        ESP_LOGE(TAG, "Failed to send CertificateUpdateExiReq");
+        goto exit;
+    }
+
+    /* Waiting for the CertUpdateExiRes msg */
+    clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
+    timespec_add_ms(&ts_abs_timeout, V2G_SECC_MSG_CERTINSTALL_TIME);
+    ESP_LOGI(TAG, "Waiting for the CertUpdateExiRes msg");
+    while ((rv == 0) && (conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == true) &&
+           (conn->ctx->intl_emergency_shutdown == false) && (conn->ctx->stop_hlc == false) &&
+           (conn->ctx->is_connection_terminated == false)) { // [V2G2-917]
+        frt_mutex_lock(&conn->ctx->mqtt_lock);
+        rv = frt_cond_timedwait(&conn->ctx->mqtt_cond, &conn->ctx->mqtt_lock, &ts_abs_timeout);
+        if (rv == EINTR)
+            rv = 0; /* restart */
+        if (rv == ETIMEDOUT) {
+            ESP_LOGE(TAG, "CertificateUpdateRes timeout occurred");
+            conn->ctx->intl_emergency_shutdown = true; // [V2G2-918]
+        }
+        frt_mutex_unlock(&conn->ctx->mqtt_lock);
+    }
+
+    if ((conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == false) &&
+        (conn->ctx->evse_v2g_data.cert_install_status == true)) {
+        const auto data =
+            mbedtls_util::base64_decode(conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.data(),
+                                         conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.size());
+        if (data.empty() || (data.size() > DEFAULT_BUFFER_SIZE)) {
+            ESP_LOGE(TAG, "Failed to decode base64 stream");
+            goto exit;
+        } else {
+            std::memcpy(conn->buffer + V2GTP_HEADER_LENGTH, data.data(), data.size());
+            conn->stream.byte_pos = data.size();
+        }
+        next_event = V2G_EVENT_SEND_RECV_EXI_MSG;
+        res->ResponseCode = iso2_responseCodeType_OK; // irrelevant but valid for validation
+        conn->stream.byte_pos += V2GTP_HEADER_LENGTH;
+    } else {
+        res->ResponseCode = iso2_responseCodeType_FAILED;
+    }
+
+exit:
+    if (V2G_EVENT_SEND_RECV_EXI_MSG != next_event) {
+        next_event = (enum v2g_event)iso_validate_response_code(&res->ResponseCode, conn);
+    } else {
+        init_iso2_CertificateUpdateResType(res);
+    }
+
+    /* Set next expected req msg */
+    conn->ctx->state = (int)iso_dc_state_id::WAIT_FOR_PAYMENTDETAILS; // [V2G-558]
+
+    return next_event;
 }
 
 /*!
