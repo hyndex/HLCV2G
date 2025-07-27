@@ -7,7 +7,9 @@
 #include <dirent.h>
 #include <errno.h>
 #include <math.h>
-#include <unistd.h> // sleep
+
+#include "freertos_shim.hpp"
+#include "freertos_sync.hpp"
 
 #include "log.hpp"
 #include "v2g_ctx.hpp"
@@ -67,40 +69,21 @@ void populate_physical_value_float(struct iso2_PhysicalValueType* pv, float valu
     pv->Value = value;
 }
 
-static void* v2g_ctx_eventloop(void* data) {
-    struct v2g_context* ctx = static_cast<struct v2g_context*>(data);
+static void v2g_ctx_eventloop(void* data) {
+    auto* ctx = static_cast<struct v2g_context*>(data);
 
     while (!ctx->shutdown) {
-        int rv;
-
-        rv = event_base_loop(ctx->event_base, 0);
-        if (rv == -1)
-            break;
-
-        /* if no events are registered, restart looping */
-        if (rv == 1)
-            sleep(1); /* FIXME this is bad since we actually do busy-waiting here */
+        /* event handling would happen here */
+        vTaskDelay(1);
     }
 
-    return NULL;
+    vTaskDelete(nullptr);
 }
 
 static int v2g_ctx_start_events(struct v2g_context* ctx) {
-    pthread_attr_t attr;
-    int rv;
-
-    /* create the thread in detached state so we don't need to join it later */
-    if (pthread_attr_init(&attr) != 0) {
-        dlog(DLOG_LEVEL_ERROR, "pthread_attr_init failed: %s", strerror(errno));
-        return -1;
-    }
-    if (pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED) != 0) {
-        dlog(DLOG_LEVEL_ERROR, "pthread_attr_setdetachstate failed: %s", strerror(errno));
-        return -1;
-    }
-
-    rv = pthread_create(&ctx->event_thread, NULL, v2g_ctx_eventloop, ctx);
-    return rv ? -1 : 0;
+    BaseType_t rv;
+    rv = xTaskCreate(v2g_ctx_eventloop, "v2g_evt", 2048, ctx, 5, &ctx->event_thread);
+    return (rv == pdPASS) ? 0 : -1;
 }
 
 void v2g_ctx_init_charging_session(struct v2g_context* const ctx, bool is_connection_terminated) {
@@ -305,18 +288,8 @@ struct v2g_context* v2g_ctx_create(ISO15118_chargerImplBase* p_chargerImplBase,
     ctx->tls_key_logging = false;
     ctx->debugMode = false;
 
-    /* according to man page, both functions never return an error */
-    evthread_use_pthreads();
-    pthread_mutex_init(&ctx->mqtt_lock, NULL);
-    pthread_condattr_init(&ctx->mqtt_attr);
-    pthread_condattr_setclock(&ctx->mqtt_attr, CLOCK_MONOTONIC);
-    pthread_cond_init(&ctx->mqtt_cond, &ctx->mqtt_attr);
-
-    ctx->event_base = event_base_new();
-    if (!ctx->event_base) {
-        dlog(DLOG_LEVEL_ERROR, "event_base_new failed");
-        goto free_out;
-    }
+    frt_mutex_init(&ctx->mqtt_lock);
+    frt_cond_init(&ctx->mqtt_cond);
 
     if (v2g_ctx_start_events(ctx) != 0)
         goto free_out;
@@ -326,10 +299,6 @@ struct v2g_context* v2g_ctx_create(ISO15118_chargerImplBase* p_chargerImplBase,
     return ctx;
 
 free_out:
-    if (ctx->event_base) {
-        event_base_loopbreak(ctx->event_base);
-        event_base_free(ctx->event_base);
-    }
     free(ctx->local_tls_addr);
     free(ctx->local_tcp_addr);
     free(ctx);
@@ -337,13 +306,9 @@ free_out:
 }
 
 void v2g_ctx_free(struct v2g_context* ctx) {
-    if (ctx->event_base) {
-        event_base_loopbreak(ctx->event_base);
-        event_base_free(ctx->event_base);
-    }
 
-    pthread_cond_destroy(&ctx->mqtt_cond);
-    pthread_mutex_destroy(&ctx->mqtt_lock);
+    frt_cond_destroy(&ctx->mqtt_cond);
+    frt_mutex_destroy(&ctx->mqtt_lock);
 
     free(ctx->local_tls_addr);
     ctx->local_tls_addr = NULL;
