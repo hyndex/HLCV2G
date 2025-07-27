@@ -9,6 +9,10 @@ ev_setup_cpp_module()
 
 # ev@bcc62523-e22b-41d7-ba2f-825b493a3c97:v1
 # insert your custom targets and additional config variables here
+# Build libcbv2g from the bundled sources. Disable its tests to
+# keep the module build lightweight.
+set(CB_V2G_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+add_subdirectory(lib/libcbv2g)
 # ev@bcc62523-e22b-41d7-ba2f-825b493a3c97:v1
 
 target_sources(${MODULE_NAME}
