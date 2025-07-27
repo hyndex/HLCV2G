@@ -9,25 +9,8 @@
 #include <everest/logging.hpp>
 
 #include <csignal>
-#include <openssl_util.hpp>
+
 namespace {
-void log_handler(openssl::log_level_t level, const std::string& str) {
-    switch (level) {
-    case openssl::log_level_t::debug:
-        // ignore debug logs
-        break;
-    case openssl::log_level_t::info:
-        EVLOG_info << str;
-        break;
-    case openssl::log_level_t::warning:
-        EVLOG_warning << str;
-        break;
-    case openssl::log_level_t::error:
-    default:
-        EVLOG_error << str;
-        break;
-    }
-}
 } // namespace
 
 struct v2g_context* v2g_ctx = nullptr;
@@ -41,8 +24,6 @@ void EvseV2G::init() {
     if (v2g_ctx == nullptr)
         return;
 
-    (void)openssl::set_log_handler(log_handler);
-    tls::Server::configure_signal_handler(SIGUSR1);
     v2g_ctx->tls_server = &tls_server;
 
     this->r_security->subscribe_certificate_store_update(
@@ -56,14 +37,8 @@ void EvseV2G::init() {
             }
 
             dlog(DLOG_LEVEL_INFO, "Certificate store update received, reconfiguring TLS server");
-            auto config = std::make_unique<tls::Server::config_t>();
-            if (build_config(*config, v2g_ctx)) {
-                dlog(DLOG_LEVEL_INFO, "Configuration of TLS server successful, updating it");
-                v2g_ctx->tls_server->update(*config);
-            } else {
-                dlog(DLOG_LEVEL_INFO, "Configuration of TLS server failed, suspending it");
-                v2g_ctx->tls_server->suspend();
-            }
+            tls::config_t config;
+            (void)build_config(config, v2g_ctx);
         });
 
     invoke_init(*p_charger);

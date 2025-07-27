@@ -48,11 +48,14 @@ target_sources(${MODULE_NAME}
         "tools.cpp"
         "v2g_ctx.cpp"
         "v2g_server.cpp"
+        "mbedtls_util.cpp"
 )
 
 target_link_libraries(${MODULE_NAME}
     PRIVATE
-        everest::tls
+        mbedtls
+        mbedcrypto
+        mbedx509
 )
 target_sources(${MODULE_NAME}
     PRIVATE

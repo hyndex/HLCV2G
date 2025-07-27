@@ -5,13 +5,21 @@
 #define TLS_CONNECTION_HPP_
 
 #include <cstddef>
-#include <tls.hpp>
+#include <mbedtls/ssl.h>
 #include <unistd.h>
 
 struct v2g_context;
 struct v2g_connection;
 
 namespace tls {
+
+struct config_t {
+    const char* certificate_chain_file{nullptr};
+    const char* private_key_file{nullptr};
+    const char* trust_anchor_pem{nullptr};
+    int socket{-1};
+    int io_timeout_ms{0};
+};
 
 /*!
  * \param ctx v2g connection context
@@ -51,7 +59,7 @@ ssize_t connection_write(struct v2g_connection* conn, unsigned char* buf, std::s
  * \param ctx v2g connection context
  * \return Returns true if the configuration was built successfully, otherwise false.
  */
-bool build_config(tls::Server::config_t& config, struct v2g_context* ctx);
+bool build_config(config_t& config, struct v2g_context* ctx);
 
 } // namespace tls
 

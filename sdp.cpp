@@ -138,11 +138,7 @@ int sdp_send_response(int sdp_socket, struct sdp_query* sdp_query) {
         return 1;
     }
 
-    using state_t = tls::Server::state_t;
-    const auto tls_server_state = sdp_query->v2g_ctx->tls_server->state();
-
-    const auto tls_server_available =
-        (tls_server_state == state_t::init_complete or tls_server_state == state_t::running);
+    const auto tls_server_available = sdp_query->v2g_ctx->tls_server != nullptr;
 
     switch (sdp_query->security_requested) {
     case SDP_SECURITY_TLS:
