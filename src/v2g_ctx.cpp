@@ -275,7 +275,8 @@ void v2g_ctx_init_charging_values(struct v2g_context* const ctx) {
 }
 
 struct v2g_context* v2g_ctx_create(ISO15118_chargerImplBase* p_chargerImplBase,
-                                   iso15118_extensionsImplBase* p_extensions, evse_securityIntf* r_security) {
+                                   iso15118_extensionsImplBase* p_extensions, evse_securityIntf* r_security,
+                                   const char* if_name) {
     struct v2g_context* ctx;
 
     ctx = new (std::nothrow) v2g_context();
@@ -299,7 +300,7 @@ struct v2g_context* v2g_ctx_create(ISO15118_chargerImplBase* p_chargerImplBase,
     v2g_ctx_init_charging_session(ctx, true);
 
     /* interface from config file or options */
-    ctx->if_name = "eth1";
+    ctx->if_name = if_name;
 
     ctx->network_read_timeout = 1000;
     ctx->network_read_timeout_tls = 5000;

@@ -21,7 +21,7 @@ namespace module {
 
 void EvseV2G::init() {
     /* create v2g context */
-    v2g_ctx = v2g_ctx_create(&(*p_charger), &(*p_extensions), &(*r_security));
+    v2g_ctx = v2g_ctx_create(&(*p_charger), &(*p_extensions), &(*r_security), config.device.c_str());
 
     if (v2g_ctx == nullptr)
         return;
