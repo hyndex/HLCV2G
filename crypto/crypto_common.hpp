@@ -4,13 +4,13 @@
 #ifndef CRTYPTO_COMMON_HPP_
 #define CRTYPTO_COMMON_HPP_
 
-#include <openssl_util.hpp>
+#include "../mbedtls_util.hpp"
 
 #include <cstddef>
 
 namespace crypto {
 
-using verify_result_t = openssl::verify_result_t;
+using verify_result_t = mbedtls_util::verify_result_t;
 
 constexpr std::size_t MAX_EXI_SIZE = 8192;
 

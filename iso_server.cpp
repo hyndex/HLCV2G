@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright (C) 2023 chargebyte GmbH
 // Copyright (C) 2023 Contributors to EVerest
-#include "openssl_util.hpp"
+#include "mbedtls_util.hpp"
 #include <cbv2g/common/exi_bitstream.h>
 #include <cbv2g/exi_v2gtp.h> //for V2GTP_HEADER_LENGTHs
 #include <cbv2g/iso_2/iso2_msgDefDatatypes.h>
@@ -17,8 +17,8 @@
 
 #include "crypto/crypto_openssl.hpp"
 #include "freertos_sync.hpp"
-using namespace openssl;
-using namespace crypto::openssl;
+using namespace mbedtls_util;
+using namespace crypto::mbedtls;
 
 #include "iso_server.hpp"
 #include "log.hpp"
@@ -496,7 +496,7 @@ static bool publish_iso_certificate_installation_exi_req(struct v2g_context* ctx
     bool rv = true;
     types::iso15118::RequestExiStreamSchema certificate_request;
 
-    certificate_request.exi_request = openssl::base64_encode(AExiBuffer, AExiBufferSize);
+    certificate_request.exi_request = mbedtls_util::base64_encode(AExiBuffer, AExiBufferSize);
     if (certificate_request.exi_request.size() > MQTT_MAX_PAYLOAD_SIZE) {
         dlog(DLOG_LEVEL_ERROR, "Mqtt payload size exceeded!");
         return false;
@@ -1701,8 +1701,8 @@ static enum v2g_event handle_iso_certificate_installation(struct v2g_connection*
 
     if ((conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == false) &&
         (conn->ctx->evse_v2g_data.cert_install_status == true)) {
-        const auto data = openssl::base64_decode(conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.data(),
-                                                 conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.size());
+        const auto data = mbedtls_util::base64_decode(conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.data(),
+                                                      conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.size());
         if (data.empty() || (data.size() > DEFAULT_BUFFER_SIZE)) {
             dlog(DLOG_LEVEL_ERROR, "Failed to decode base64 stream");
             goto exit;

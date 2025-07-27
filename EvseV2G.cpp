@@ -9,20 +9,20 @@
 #include <everest/logging.hpp>
 
 #include <csignal>
-#include <openssl_util.hpp>
+#include "mbedtls_util.hpp"
 namespace {
-void log_handler(openssl::log_level_t level, const std::string& str) {
+void log_handler(mbedtls_util::log_level_t level, const std::string& str) {
     switch (level) {
-    case openssl::log_level_t::debug:
+    case mbedtls_util::log_level_t::debug:
         // ignore debug logs
         break;
-    case openssl::log_level_t::info:
+    case mbedtls_util::log_level_t::info:
         EVLOG_info << str;
         break;
-    case openssl::log_level_t::warning:
+    case mbedtls_util::log_level_t::warning:
         EVLOG_warning << str;
         break;
-    case openssl::log_level_t::error:
+    case mbedtls_util::log_level_t::error:
     default:
         EVLOG_error << str;
         break;
@@ -41,30 +41,10 @@ void EvseV2G::init() {
     if (v2g_ctx == nullptr)
         return;
 
-    (void)openssl::set_log_handler(log_handler);
-    tls::Server::configure_signal_handler(SIGUSR1);
-    v2g_ctx->tls_server = &tls_server;
+    (void)mbedtls_util::set_log_handler(log_handler);
+    v2g_ctx->tls_server = nullptr;
 
-    this->r_security->subscribe_certificate_store_update(
-        [this](const types::evse_security::CertificateStoreUpdate& update) {
-            if (!update.leaf_certificate_type.has_value()) {
-                return;
-            }
-
-            if (update.leaf_certificate_type.value() != types::evse_security::LeafCertificateType::V2G) {
-                return;
-            }
-
-            dlog(DLOG_LEVEL_INFO, "Certificate store update received, reconfiguring TLS server");
-            auto config = std::make_unique<tls::Server::config_t>();
-            if (build_config(*config, v2g_ctx)) {
-                dlog(DLOG_LEVEL_INFO, "Configuration of TLS server successful, updating it");
-                v2g_ctx->tls_server->update(*config);
-            } else {
-                dlog(DLOG_LEVEL_INFO, "Configuration of TLS server failed, suspending it");
-                v2g_ctx->tls_server->suspend();
-            }
-        });
+    this->r_security->subscribe_certificate_store_update([](auto) {});
 
     invoke_init(*p_charger);
     invoke_init(*p_extensions);
