@@ -11,8 +11,10 @@
 #include "freertos_shim.hpp"
 #include "freertos_sync.hpp"
 
-#include "log.hpp"
+#include "esp_log.h"
 #include "v2g_ctx.hpp"
+
+static const char* TAG = "v2g_ctx";
 
 #include <cbv2g/iso_2/iso2_msgDefDatatypes.h>
 
@@ -36,7 +38,7 @@ bool populate_physical_value(struct iso2_PhysicalValueType* pv, long long int va
 
     if ((pv->Multiplier < PHY_VALUE_MULT_MIN) || (pv->Multiplier > PHY_VALUE_MULT_MAX)) {
         memcpy(pv, &physic_tmp, sizeof(struct iso2_PhysicalValueType));
-        dlog(DLOG_LEVEL_WARNING, "Physical value out of scope. Ignore value");
+        ESP_LOGW(TAG, "Physical value out of scope. Ignore value");
         return false;
     }
 
@@ -61,8 +63,7 @@ void populate_physical_value_float(struct iso2_PhysicalValueType* pv, float valu
     }
 
     if (pv->Multiplier != -decimal_places) {
-        dlog(DLOG_LEVEL_WARNING,
-             "Possible precision loss while converting to physical value type, requested %i, actual %i (value %f)",
+        ESP_LOGW(TAG, "Possible precision loss while converting to physical value type, requested %i, actual %i (value %f)",
              decimal_places, -pv->Multiplier, value);
     }
 
@@ -409,10 +410,10 @@ void publish_dc_ev_remaining_time(struct v2g_context* ctx, const float& v2g_dc_e
 void log_selected_energy_transfer_type(int selected_energy_transfer_mode) {
     if (selected_energy_transfer_mode >= iso2_EnergyTransferModeType_AC_single_phase_core &&
         selected_energy_transfer_mode <= iso2_EnergyTransferModeType_DC_unique) {
-        dlog(DLOG_LEVEL_INFO, "Selected energy transfer mode: %s",
+        ESP_LOGI(TAG, "Selected energy transfer mode: %s",
              selected_energy_transfer_mode_string[selected_energy_transfer_mode]);
     } else {
-        dlog(DLOG_LEVEL_WARNING, "Selected energy transfer mode %d is invalid", selected_energy_transfer_mode);
+        ESP_LOGW(TAG, "Selected energy transfer mode %d is invalid", selected_energy_transfer_mode);
     }
 }
 
@@ -433,7 +434,7 @@ bool add_service_to_service_list(struct v2g_context* v2g_ctx, const struct iso2_
     if (service_found == false and (v2g_ctx->evse_v2g_data.evse_service_list.size() < iso2_ServiceType_8_ARRAY_SIZE)) {
         v2g_ctx->evse_v2g_data.evse_service_list.push_back(evse_service);
     } else if (v2g_ctx->evse_v2g_data.evse_service_list.size() == iso2_ServiceType_8_ARRAY_SIZE) {
-        dlog(DLOG_LEVEL_ERROR, "Maximum service list size reached. Unable to add service ID %u",
+        ESP_LOGE(TAG, "Maximum service list size reached. Unable to add service ID %u",
              evse_service.ServiceID);
         return false;
     }
@@ -471,7 +472,7 @@ void configure_parameter_set(struct iso2_ServiceParameterListType* parameterSetL
         write_idx = parameterSetList->ParameterSet.arrayLen;
         parameterSetList->ParameterSet.arrayLen++;
     } else if (parameterSetList->ParameterSet.arrayLen == iso2_ParameterSetType_5_ARRAY_SIZE) {
-        dlog(DLOG_LEVEL_ERROR, "Maximum parameter-set list size reached. Unable to add parameter-set-ID %d",
+        ESP_LOGE(TAG, "Maximum parameter-set list size reached. Unable to add parameter-set-ID %d",
              parameterSetId);
         return;
     }
@@ -511,6 +512,6 @@ void configure_parameter_set(struct iso2_ServiceParameterListType* parameterSetL
             parameterSet->Parameter.arrayLen = 1;
         }
     } else {
-        dlog(DLOG_LEVEL_WARNING, "Parameter-set-ID of service ID %u is not supported", serviceId);
+        ESP_LOGW(TAG, "Parameter-set-ID of service ID %u is not supported", serviceId);
     }
 }

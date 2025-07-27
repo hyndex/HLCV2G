@@ -7,9 +7,11 @@
 #include "crypto_openssl.hpp"
 #include "../mbedtls_util.hpp"
 #include "iso_server.hpp"
-#include "log.hpp"
+#include "esp_log.h"
 
 #include <cbv2g/common/exi_bitstream.h>
+
+static const char* TAG = "crypto";
 #include <cbv2g/exi_v2gtp.h> //for V2GTP_HEADER_LENGTHs
 #include <cbv2g/iso_2/iso2_msgDefDatatypes.h>
 #include <cbv2g/iso_2/iso2_msgDefDecoder.h>
@@ -43,7 +45,7 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
 
     auto err = encode_iso2_exiFragment(&stream, iso2_exi_fragment);
     if (err != 0) {
-        dlog(DLOG_LEVEL_ERROR, "Unable to encode fragment, error code = %d", err);
+        ESP_LOGE(TAG, "Unable to encode fragment, error code = %d", err);
         bRes = false;
     }
 
@@ -58,13 +60,13 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
     // check hash matches the value in the message
     if (bRes) {
         if (req_ref->DigestValue.bytesLen != digest.size()) {
-            dlog(DLOG_LEVEL_ERROR, "Invalid digest length %u in signature", req_ref->DigestValue.bytesLen);
+            ESP_LOGE(TAG, "Invalid digest length %u in signature", req_ref->DigestValue.bytesLen);
             bRes = false;
         }
     }
     if (bRes) {
         if (std::memcmp(req_ref->DigestValue.bytes, digest.data(), digest.size()) != 0) {
-            dlog(DLOG_LEVEL_ERROR, "Invalid digest in signature");
+            ESP_LOGE(TAG, "Invalid digest in signature");
             bRes = false;
         }
     }
@@ -94,7 +96,7 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
         err = encode_iso2_xmldsigFragment(&stream, &sig_fragment);
 
         if (err != 0) {
-            dlog(DLOG_LEVEL_ERROR, "Unable to encode XML signature fragment, error code = %d", err);
+            ESP_LOGE(TAG, "Unable to encode XML signature fragment, error code = %d", err);
             bRes = false;
         }
     }
@@ -108,7 +110,7 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
     if (bRes) {
         /* Validate the ecdsa signature using the public key */
         if (signature_len != mbedtls_util::signature_size) {
-            dlog(DLOG_LEVEL_ERROR, "Signature len is invalid (%i)", signature_len);
+            ESP_LOGE(TAG, "Signature len is invalid (%i)", signature_len);
             bRes = false;
         }
     }
@@ -134,7 +136,7 @@ bool load_contract_root_cert(mbedtls_util::certificate_list& trust_anchors, cons
                          std::make_move_iterator(v2g_certs.end()));
 
     if (trust_anchors.empty()) {
-        dlog(DLOG_LEVEL_ERROR, "Unable to load any MO or V2G root(s)");
+        ESP_LOGE(TAG, "Unable to load any MO or V2G root(s)");
     }
 
     return !trust_anchors.empty();
@@ -175,7 +177,7 @@ std::string chain_to_pem(const mbedtls_util::certificate_ptr& cert, const mbedtl
     for (const auto& crt : *chain) {
         const auto pem = mbedtls_util::certificate_to_pem(crt.get());
         if (pem.empty()) {
-            dlog(DLOG_LEVEL_ERROR, "Unable to encode certificate chain");
+            ESP_LOGE(TAG, "Unable to encode certificate chain");
             break;
         }
         contract_cert_chain_pem.append(pem);
