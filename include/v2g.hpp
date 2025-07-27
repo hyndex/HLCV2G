@@ -78,6 +78,15 @@ enum v2g_event {
     V2G_EVENT_IGNORE_MSG            // Received message can't be handled
 };
 
+enum cp_state {
+    CP_STATE_A = 0,
+    CP_STATE_B,
+    CP_STATE_C,
+    CP_STATE_D,
+    CP_STATE_E,
+    CP_STATE_F
+};
+
 enum v2g_protocol {
     V2G_PROTO_DIN70121 = 0,
     V2G_PROTO_ISO15118_2010,
@@ -232,6 +241,7 @@ struct v2g_context {
                                       immediately without response message) */
     std::atomic<bool> terminate_connection_on_failed_response;
     std::atomic<bool> contactor_is_closed; /* Actual contactor state */
+    std::atomic<cp_state> cp_state;       /* Control pilot state */
 
     struct {
         bool meter_info_is_used;

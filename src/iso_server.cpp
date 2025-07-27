@@ -55,6 +55,31 @@ static iso2_responseCodeType iso_validate_state(int state, enum V2gMsgTypeId cur
                                                        : iso2_responseCodeType_FAILED_SequenceError;
 }
 
+static bool wait_for_cp_states(struct v2g_context* ctx, cp_state s1, cp_state s2, long timeout_ms) {
+    struct timespec ts_abs_timeout;
+    clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
+    timespec_add_ms(&ts_abs_timeout, timeout_ms);
+    int rv = 0;
+    while ((ctx->cp_state != s1 && ctx->cp_state != s2) && (rv == 0) &&
+           (ctx->intl_emergency_shutdown == false) && (ctx->stop_hlc == false) &&
+           (ctx->is_connection_terminated == false)) {
+        frt_mutex_lock(&ctx->mqtt_lock);
+        rv = frt_cond_timedwait(&ctx->mqtt_cond, &ctx->mqtt_lock, &ts_abs_timeout);
+        if (rv == EINTR)
+            rv = 0;
+        frt_mutex_unlock(&ctx->mqtt_lock);
+    }
+
+    if ((rv == ETIMEDOUT) || ((ctx->cp_state != s1) && (ctx->cp_state != s2))) {
+        return false;
+    }
+    return true;
+}
+
+static bool wait_for_cp_state(struct v2g_context* ctx, cp_state state, long timeout_ms) {
+    return wait_for_cp_states(ctx, state, state, timeout_ms);
+}
+
 /*!
  * \brief iso_validate_response_code This function checks if an external error has occurred (sequence error, user abort)
  * ... ). \param iso_response_code is a pointer to the current response code. The value will be modified if an external
@@ -1247,8 +1272,12 @@ static enum v2g_event handle_iso_charge_parameter_discovery(struct v2g_connectio
 
     res->SASchedules_isUsed = 0;
 
-    // TODO: For DC charging wait for CP state B , before transmitting of the response ([V2G2-921], [V2G2-922]). CP
-    // state is checked by other module
+    if (conn->ctx->is_dc_charger == true) {
+        if (!wait_for_cp_state(conn->ctx, CP_STATE_B, V2G_CPSTATE_DETECTION_TIMEOUT)) {
+            ESP_LOGE(TAG, "timeout waiting for CP state B");
+            conn->ctx->intl_emergency_shutdown = true;
+        }
+    }
 
     /* reset our internal reminder that renegotiation was requested */
     conn->ctx->session.renegotiation_required = false; // Reset renegotiation flag
@@ -1425,8 +1454,10 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
         conn->ctx->p_charger->publish_v2g_setup_finished(nullptr);
 
         if (conn->ctx->is_dc_charger == false) {
-            // TODO: For AC charging wait for CP state C or D , before transmitting of the response. CP state is checked
-            // by other module
+            if (!wait_for_cp_states(conn->ctx, CP_STATE_C, CP_STATE_D, V2G_CP_STATE_B_TO_C_D_TIMEOUT_RELAXED)) {
+                ESP_LOGE(TAG, "timeout waiting for CP state C or D");
+                res->ResponseCode = iso2_responseCodeType_FAILED_ContactorError;
+            }
             if (conn->ctx->contactor_is_closed == false) {
                 // TODO: Signal closing contactor with MQTT if no timeout while waiting for state C or D
                 conn->ctx->p_charger->publish_ac_close_contactor(nullptr);
@@ -1461,8 +1492,10 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
         conn->ctx->session.is_charging = false;
 
         if (conn->ctx->is_dc_charger == false) {
-            // TODO: For AC charging wait for CP state change from C/D to B , before transmitting of the response. CP
-            // state is checked by other module
+            if (!wait_for_cp_state(conn->ctx, CP_STATE_B, V2G_CP_STATE_C_D_TO_B_TIMEOUT)) {
+                ESP_LOGE(TAG, "timeout waiting for CP state B");
+                res->ResponseCode = iso2_responseCodeType_FAILED_ContactorError;
+            }
             conn->ctx->p_charger->publish_ac_open_contactor(nullptr);
         } else {
             conn->ctx->p_charger->publish_current_demand_finished(nullptr);
@@ -1843,8 +1876,10 @@ static enum v2g_event handle_iso_cable_check(struct v2g_connection* conn) {
     /* At first, publish the received EV request message to the MQTT interface */
     publish_DcEvStatus(conn->ctx, req->DC_EVStatus);
 
-    // TODO: For DC charging wait for CP state C or D , before transmitting of the response ([V2G2-917], [V2G2-918]). CP
-    // state is checked by other module
+    if (!wait_for_cp_states(conn->ctx, CP_STATE_C, CP_STATE_D, V2G_CPSTATE_DETECTION_TIMEOUT)) {
+        ESP_LOGE(TAG, "timeout waiting for CP state C or D");
+        conn->ctx->intl_emergency_shutdown = true;
+    }
 
     /* Fill the CableCheckRes */
     res->ResponseCode = iso2_responseCodeType_OK;
@@ -2076,8 +2111,10 @@ static enum v2g_event handle_iso_welding_detection(struct v2g_connection* conn) 
     /* At first, publish the received EV request message to the MQTT interface */
     publish_iso_welding_detection_req(conn->ctx, req);
 
-    // TODO: Wait for CP state B, before transmitting of the response, or signal intl_emergency_shutdown in conn->ctx
-    // ([V2G2-920], [V2G2-921]).
+    if (!wait_for_cp_state(conn->ctx, CP_STATE_B, V2G_CPSTATE_DETECTION_TIMEOUT)) {
+        ESP_LOGE(TAG, "timeout waiting for CP state B");
+        conn->ctx->intl_emergency_shutdown = true; // [V2G2-920], [V2G2-921]
+    }
 
     res->DC_EVSEStatus.EVSEIsolationStatus = (iso2_isolationLevelType)conn->ctx->evse_v2g_data.evse_isolation_status;
     res->DC_EVSEStatus.EVSEIsolationStatus_isUsed = conn->ctx->evse_v2g_data.evse_isolation_status_is_used;
