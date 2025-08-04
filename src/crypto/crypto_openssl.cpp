@@ -7,7 +7,7 @@
 #include <crypto/crypto_openssl.hpp>
 #include <mbedtls_util.hpp>
 #include <iso_server.hpp>
-#include "esp_log.h"
+#include "logging.hpp"
 
 #include <cbv2g/common/exi_bitstream.h>
 
@@ -45,7 +45,7 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
 
     auto err = encode_iso2_exiFragment(&stream, iso2_exi_fragment);
     if (err != 0) {
-        ESP_LOGE(TAG, "Unable to encode fragment, error code = %d", err);
+        LOGE(TAG, "Unable to encode fragment, error code = %d", err);
         bRes = false;
     }
 
@@ -60,13 +60,13 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
     // check hash matches the value in the message
     if (bRes) {
         if (req_ref->DigestValue.bytesLen != digest.size()) {
-            ESP_LOGE(TAG, "Invalid digest length %u in signature", req_ref->DigestValue.bytesLen);
+            LOGE(TAG, "Invalid digest length %u in signature", req_ref->DigestValue.bytesLen);
             bRes = false;
         }
     }
     if (bRes) {
         if (std::memcmp(req_ref->DigestValue.bytes, digest.data(), digest.size()) != 0) {
-            ESP_LOGE(TAG, "Invalid digest in signature");
+            LOGE(TAG, "Invalid digest in signature");
             bRes = false;
         }
     }
@@ -96,7 +96,7 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
         err = encode_iso2_xmldsigFragment(&stream, &sig_fragment);
 
         if (err != 0) {
-            ESP_LOGE(TAG, "Unable to encode XML signature fragment, error code = %d", err);
+            LOGE(TAG, "Unable to encode XML signature fragment, error code = %d", err);
             bRes = false;
         }
     }
@@ -110,7 +110,7 @@ bool check_iso2_signature(const struct iso2_SignatureType* iso2_signature, mbedt
     if (bRes) {
         /* Validate the ecdsa signature using the public key */
         if (signature_len != mbedtls_util::signature_size) {
-            ESP_LOGE(TAG, "Signature len is invalid (%i)", signature_len);
+            LOGE(TAG, "Signature len is invalid (%i)", signature_len);
             bRes = false;
         }
     }
@@ -136,7 +136,7 @@ bool load_contract_root_cert(mbedtls_util::certificate_list& trust_anchors, cons
                          std::make_move_iterator(v2g_certs.end()));
 
     if (trust_anchors.empty()) {
-        ESP_LOGE(TAG, "Unable to load any MO or V2G root(s)");
+        LOGE(TAG, "Unable to load any MO or V2G root(s)");
     }
 
     return !trust_anchors.empty();
@@ -177,7 +177,7 @@ std::string chain_to_pem(const mbedtls_util::certificate_ptr& cert, const mbedtl
     for (const auto& crt : *chain) {
         const auto pem = mbedtls_util::certificate_to_pem(crt.get());
         if (pem.empty()) {
-            ESP_LOGE(TAG, "Unable to encode certificate chain");
+            LOGE(TAG, "Unable to encode certificate chain");
             break;
         }
         contract_cert_chain_pem.append(pem);

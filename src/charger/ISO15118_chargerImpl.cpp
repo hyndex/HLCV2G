@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2023 chargebyte GmbH
 // Copyright (C) 2022-2023 Contributors to EVerest
 #include <charger/ISO15118_chargerImpl.hpp>
-#include "esp_log.h"
+#include "logging.hpp"
 #include <v2g_ctx.hpp>
 #include <freertos_sync.hpp>
 
@@ -18,7 +18,7 @@ namespace charger {
 
 void ISO15118_chargerImpl::init() {
     if (!v2g_ctx) {
-        ESP_LOGE(TAG, "v2g_ctx not created");
+        LOGE(TAG, "v2g_ctx not created");
         return;
     }
 
@@ -33,13 +33,13 @@ void ISO15118_chargerImpl::init() {
     /* Configure tls_security */
     if (mod->config.tls_security == "force") {
         v2g_ctx->tls_security = TLS_SECURITY_FORCE;
-        ESP_LOGD(TAG, "tls_security force");
+        LOGD(TAG, "tls_security force");
     } else if (mod->config.tls_security == "allow") {
         v2g_ctx->tls_security = TLS_SECURITY_ALLOW;
-        ESP_LOGD(TAG, "tls_security allow");
+        LOGD(TAG, "tls_security allow");
     } else {
         v2g_ctx->tls_security = TLS_SECURITY_PROHIBIT;
-        ESP_LOGD(TAG, "tls_security prohibit");
+        LOGD(TAG, "tls_security prohibit");
     }
 
     v2g_ctx->terminate_connection_on_failed_response = mod->config.terminate_connection_on_failed_response;
@@ -48,7 +48,7 @@ void ISO15118_chargerImpl::init() {
     v2g_ctx->tls_key_logging_path = mod->config.tls_key_logging_path;
 
     if (mod->config.tls_key_logging == true) {
-        ESP_LOGD(TAG, "tls-key-logging enabled (path: %s)", mod->config.tls_key_logging_path.c_str());
+        LOGD(TAG, "tls-key-logging enabled (path: %s)", mod->config.tls_key_logging_path.c_str());
     }
 
     v2g_ctx->network_read_timeout_tls = mod->config.tls_timeout;
@@ -73,7 +73,7 @@ void ISO15118_chargerImpl::handle_setup(
         memcpy(v2g_ctx->evse_v2g_data.evse_id.bytes, reinterpret_cast<uint8_t*>(evse_id.evse_id.data()), len);
         v2g_ctx->evse_v2g_data.evse_id.bytesLen = len;
     } else {
-        ESP_LOGW(TAG, "EVSEID_CHARACTER_SIZE exceeded (received: %u, max: %u)", len,
+        LOGW(TAG, "EVSEID_CHARACTER_SIZE exceeded (received: %u, max: %u)", len,
              iso2_EVSEID_CHARACTER_SIZE);
     }
 
@@ -89,7 +89,7 @@ void ISO15118_chargerImpl::handle_setup(
         for (const auto& mode : supported_energy_transfer_modes) {
 
             if (mode.bidirectional) {
-                ESP_LOGI(TAG, "Ignoring bidirectional SupportedEnergyTransferMode");
+                LOGI(TAG, "Ignoring bidirectional SupportedEnergyTransferMode");
                 continue;
             }
 
@@ -117,7 +117,7 @@ void ISO15118_chargerImpl::handle_setup(
             default:
                 if (energyArrayLen == 0) {
 
-                    ESP_LOGW(TAG, "Unable to configure SupportedEnergyTransferMode %s",
+                    LOGW(TAG, "Unable to configure SupportedEnergyTransferMode %s",
                          types::iso15118::energy_transfer_mode_to_string(mode.energy_transfer_mode).c_str());
                 }
                 break;
@@ -126,7 +126,7 @@ void ISO15118_chargerImpl::handle_setup(
 
         if (mod->config.supported_DIN70121 == true and v2g_ctx->is_dc_charger == false) {
             v2g_ctx->supported_protocols &= ~(1 << V2G_PROTO_DIN70121);
-            ESP_LOGW(TAG, "Removed DIN70121 from the list of supported protocols as AC is enabled");
+            LOGW(TAG, "Removed DIN70121 from the list of supported protocols as AC is enabled");
         }
     }
 
@@ -177,7 +177,7 @@ void ISO15118_chargerImpl::handle_session_setup(std::vector<types::iso15118::Pay
                     iso2_paymentOptionType_ExternalPayment;
                 v2g_ctx->evse_v2g_data.payment_option_list_len++;
             } else if (v2g_ctx->evse_v2g_data.payment_option_list_len == 0) {
-                ESP_LOGW(TAG, "Unable to configure PaymentOptions %s",
+                LOGW(TAG, "Unable to configure PaymentOptions %s",
                      types::iso15118::payment_option_to_string(option).c_str());
             }
         }
@@ -294,7 +294,7 @@ void ISO15118_chargerImpl::handle_stop_charging(bool& stop) {
 }
 
 void ISO15118_chargerImpl::handle_pause_charging(bool& pause) {
-    ESP_LOGW(TAG, "Pause initialized by the charger is not supported in DIN70121 and ISO15118-2");
+    LOGW(TAG, "Pause initialized by the charger is not supported in DIN70121 and ISO15118-2");
 }
 
 void ISO15118_chargerImpl::handle_set_charging_parameters(types::iso15118::SetupPhysicalValues& physical_values) {
@@ -384,7 +384,7 @@ void ISO15118_chargerImpl::handle_update_meter_info(types::powermeter::Powermete
             memcpy(v2g_ctx->meter_info.meter_id.bytes, powermeter.meter_id->c_str(), len);
             v2g_ctx->meter_info.meter_id.bytesLen = len;
         } else {
-            ESP_LOGW(TAG, "MeterID_CHARACTER_SIZEexceeded (received: %u, max: %u)", len,
+            LOGW(TAG, "MeterID_CHARACTER_SIZEexceeded (received: %u, max: %u)", len,
                  iso2_MeterID_CHARACTER_SIZE);
         }
     }

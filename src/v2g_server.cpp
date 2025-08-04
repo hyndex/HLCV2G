@@ -22,7 +22,7 @@
 #include <connection/connection.hpp>
 #include <din_server.hpp>
 #include <iso_server.hpp>
-#include "esp_log.h"
+#include "logging.hpp"
 #include <tools.hpp>
 
 static const char* TAG = "v2g_server";
@@ -121,7 +121,7 @@ static void publish_var_V2G_Message(v2g_connection* conn, bool is_req) {
 
     EXI_Base64 = mbedtls_util::base64_encode(conn->buffer, conn->payload_len + V2GTP_HEADER_LENGTH);
     if (EXI_Base64.size() == 0) {
-        ESP_LOGW(TAG, "Unable to base64 encode EXI buffer");
+        LOGW(TAG, "Unable to base64 encode EXI buffer");
     }
 
     v2g_message.exi_base64 = EXI_Base64;
@@ -144,7 +144,7 @@ static int v2g_incoming_v2gtp(struct v2g_connection* conn) {
     /* read and process header */
     rv = conn->read(conn, conn->buffer, V2GTP_HEADER_LENGTH);
     if (rv < 0) {
-        ESP_LOGE(TAG, "connection_read(header) failed: %s",
+        LOGE(TAG, "connection_read(header) failed: %s",
              (rv == -1) ? strerror(errno) : "connection terminated");
         return -1;
     }
@@ -152,24 +152,24 @@ static int v2g_incoming_v2gtp(struct v2g_connection* conn) {
     if (rv == 0)
         return 1;
     if (rv != V2GTP_HEADER_LENGTH) {
-        ESP_LOGE(TAG, "connection_read(header) too short: expected %d, got %d", V2GTP_HEADER_LENGTH, rv);
+        LOGE(TAG, "connection_read(header) too short: expected %d, got %d", V2GTP_HEADER_LENGTH, rv);
         return -1;
     }
 
     rv = V2GTP_ReadHeader(conn->buffer, &conn->payload_len);
     if (rv == -1) {
-        ESP_LOGE(TAG, "Invalid v2gtp header");
+        LOGE(TAG, "Invalid v2gtp header");
         return -1;
     }
 
     if (conn->payload_len >= UINT32_MAX - V2GTP_HEADER_LENGTH) {
-        ESP_LOGE(TAG, "Prevent integer overflow - payload too long: have %d, would need %u",
+        LOGE(TAG, "Prevent integer overflow - payload too long: have %d, would need %u",
              DEFAULT_BUFFER_SIZE, conn->payload_len);
         return -1;
     }
 
     if (conn->payload_len + V2GTP_HEADER_LENGTH > DEFAULT_BUFFER_SIZE) {
-        ESP_LOGE(TAG, "payload too long: have %d, would need %u", DEFAULT_BUFFER_SIZE,
+        LOGE(TAG, "payload too long: have %d, would need %u", DEFAULT_BUFFER_SIZE,
              conn->payload_len + V2GTP_HEADER_LENGTH);
 
         /* we have no way to flush/discard remaining unread data from the socket without reading it in chunks,
@@ -181,12 +181,12 @@ static int v2g_incoming_v2gtp(struct v2g_connection* conn) {
     /* read request */
     rv = conn->read(conn, &conn->buffer[V2GTP_HEADER_LENGTH], conn->payload_len);
     if (rv < 0) {
-        ESP_LOGE(TAG, "connection_read(payload) failed: %s",
+        LOGE(TAG, "connection_read(payload) failed: %s",
              (rv == -1) ? strerror(errno) : "connection terminated");
         return -1;
     }
     if (rv != conn->payload_len) {
-        ESP_LOGE(TAG, "connection_read(payload) too short: expected %d, got %d", conn->payload_len, rv);
+        LOGE(TAG, "connection_read(payload) too short: expected %d, got %d", conn->payload_len, rv);
         return -1;
     }
     /* adjust buffer pos to decode request */
@@ -211,7 +211,7 @@ int v2g_outgoing_v2gtp(struct v2g_connection* conn) {
     V2GTP_WriteHeader(conn->buffer, len - V2GTP_HEADER_LENGTH);
 
     if (conn->write(conn, conn->buffer, len) == -1) {
-        ESP_LOGE(TAG, "connection_write(header) failed: %s", strerror(errno));
+        LOGE(TAG, "connection_write(header) failed: %s", strerror(errno));
         return -1;
     }
 
@@ -235,11 +235,11 @@ static enum v2g_event v2g_handle_apphandshake(struct v2g_connection* conn) {
     conn->handshake_resp.supportedAppProtocolRes.ResponseCode =
         appHand_responseCodeType_Failed_NoNegotiation; // [V2G2-172]
 
-    ESP_LOGI(TAG, "Handling SupportedAppProtocolReq");
+    LOGI(TAG, "Handling SupportedAppProtocolReq");
     conn->ctx->current_v2g_msg = V2G_SUPPORTED_APP_PROTOCOL_MSG;
 
     if (decode_appHand_exiDocument(&conn->stream, &conn->handshake_req) != 0) {
-        ESP_LOGE(TAG, "decode_appHandExiDocument() failed");
+        LOGE(TAG, "decode_appHandExiDocument() failed");
         return V2G_EVENT_TERMINATE_CONNECTION; // If the mesage can't be decoded we have to terminate the tcp-connection
                                                // (e.g. after an unexpected message)
     }
@@ -252,11 +252,11 @@ static enum v2g_event v2g_handle_apphandshake(struct v2g_connection* conn) {
                                  app_proto->ProtocolNamespace.charactersLen);
 
         if (!proto_ns) {
-            ESP_LOGE(TAG, "out-of-memory condition");
+            LOGE(TAG, "out-of-memory condition");
             return V2G_EVENT_TERMINATE_CONNECTION;
         }
 
-        ESP_LOGV(TAG, "handshake_req: Namespace: %s, Version: %" PRIu32 ".%" PRIu32 ", SchemaID: %" PRIu8 ", Priority: %" PRIu8,
+        LOGV(TAG, "handshake_req: Namespace: %s, Version: %" PRIu32 ".%" PRIu32 ", SchemaID: %" PRIu8 ", Priority: %" PRIu8,
              proto_ns, app_proto->VersionNumberMajor, app_proto->VersionNumberMinor, app_proto->SchemaID,
              app_proto->Priority);
 
@@ -306,17 +306,17 @@ static enum v2g_event v2g_handle_apphandshake(struct v2g_connection* conn) {
             appHand_responseCodeType_OK_SuccessfulNegotiationWithMinorDeviation) {
         conn->handshake_resp.supportedAppProtocolRes.SchemaID_isUsed = (unsigned int)1;
         if (V2G_PROTO_DIN70121 == conn->ctx->selected_protocol) {
-            ESP_LOGI(TAG, "Protocol negotiation was successful. Selected protocol is DIN70121");
+            LOGI(TAG, "Protocol negotiation was successful. Selected protocol is DIN70121");
             selected_protocol_str = "DIN70121";
         } else if (V2G_PROTO_ISO15118_2013 == conn->ctx->selected_protocol) {
-            ESP_LOGI(TAG, "Protocol negotiation was successful. Selected protocol is ISO15118");
+            LOGI(TAG, "Protocol negotiation was successful. Selected protocol is ISO15118");
             selected_protocol_str = "ISO15118-2-2013";
         } else if (V2G_PROTO_ISO15118_2010 == conn->ctx->selected_protocol) {
-            ESP_LOGI(TAG, "Protocol negotiation was successful. Selected protocol is ISO15118-2010");
+            LOGI(TAG, "Protocol negotiation was successful. Selected protocol is ISO15118-2010");
             selected_protocol_str = "ISO15118-2-2010";
         }
     } else {
-        ESP_LOGE(TAG, "No compatible protocol found");
+        LOGE(TAG, "No compatible protocol found");
         selected_protocol_str = "None";
         next_event = V2G_EVENT_SEND_AND_TERMINATE; // Send response and terminate tcp-connection
     }
@@ -326,7 +326,7 @@ static enum v2g_event v2g_handle_apphandshake(struct v2g_connection* conn) {
     }
 
     if (conn->ctx->is_connection_terminated == true) {
-        ESP_LOGE(TAG, "Connection is terminated. Abort charging");
+        LOGE(TAG, "Connection is terminated. Abort charging");
         return V2G_EVENT_TERMINATE_CONNECTION; // Abort charging without sending a response
     }
 
@@ -334,7 +334,7 @@ static enum v2g_event v2g_handle_apphandshake(struct v2g_connection* conn) {
     if ((conn->ctx->intl_emergency_shutdown == true) || (conn->ctx->stop_hlc == true) ||
         (V2G_EVENT_SEND_AND_TERMINATE == next_event)) {
         conn->handshake_resp.supportedAppProtocolRes.ResponseCode = appHand_responseCodeType_Failed_NoNegotiation;
-        ESP_LOGE(TAG, "Abort charging session");
+        LOGE(TAG, "Abort charging session");
 
         if (conn->ctx->terminate_connection_on_failed_response == true) {
             next_event = V2G_EVENT_SEND_AND_TERMINATE; // send response and terminate the TCP-connection
@@ -346,7 +346,7 @@ static enum v2g_event v2g_handle_apphandshake(struct v2g_connection* conn) {
     conn->stream.bit_count = 0;
 
     if (encode_appHand_exiDocument(&conn->stream, &conn->handshake_resp) != 0) {
-        ESP_LOGE(TAG, "Encoding of the protocol handshake message failed");
+        LOGE(TAG, "Encoding of the protocol handshake message failed");
         next_event = V2G_EVENT_SEND_AND_TERMINATE;
     }
 
@@ -384,7 +384,7 @@ int v2g_handle_connection(struct v2g_connection* conn) {
         rv = v2g_incoming_v2gtp(conn);
 
         if (rv != 0) {
-            ESP_LOGE(TAG, "v2g_incoming_v2gtp() failed");
+            LOGE(TAG, "v2g_incoming_v2gtp() failed");
             goto error_out;
         }
 
@@ -397,7 +397,7 @@ int v2g_handle_connection(struct v2g_connection* conn) {
         rvAppHandshake = v2g_handle_apphandshake(conn);
 
         if (rvAppHandshake == V2G_EVENT_IGNORE_MSG) {
-            ESP_LOGW(TAG, "v2g_handle_apphandshake() failed, ignoring packet");
+            LOGW(TAG, "v2g_handle_apphandshake() failed, ignoring packet");
         }
     } while ((rv == 1) && (rvAppHandshake == V2G_EVENT_IGNORE_MSG));
 
@@ -412,7 +412,7 @@ int v2g_handle_connection(struct v2g_connection* conn) {
         rv = v2g_outgoing_v2gtp(conn);
 
         if (rv == -1) {
-            ESP_LOGE(TAG, "v2g_outgoing_v2gtp() failed");
+            LOGE(TAG, "v2g_outgoing_v2gtp() failed");
             goto error_out;
         }
     }
@@ -432,12 +432,12 @@ int v2g_handle_connection(struct v2g_connection* conn) {
     case V2G_PROTO_ISO15118_2010:
         conn->exi_in.dinEXIDocument = static_cast<struct din_exiDocument*>(calloc(1, sizeof(struct din_exiDocument)));
         if (conn->exi_in.dinEXIDocument == NULL) {
-            ESP_LOGE(TAG, "out-of-memory");
+            LOGE(TAG, "out-of-memory");
             goto error_out;
         }
         conn->exi_out.dinEXIDocument = static_cast<struct din_exiDocument*>(calloc(1, sizeof(struct din_exiDocument)));
         if (conn->exi_out.dinEXIDocument == NULL) {
-            ESP_LOGE(TAG, "out-of-memory");
+            LOGE(TAG, "out-of-memory");
             goto error_out;
         }
         break;
@@ -445,13 +445,13 @@ int v2g_handle_connection(struct v2g_connection* conn) {
         conn->exi_in.iso2EXIDocument =
             static_cast<struct iso2_exiDocument*>(calloc(1, sizeof(struct iso2_exiDocument)));
         if (conn->exi_in.iso2EXIDocument == NULL) {
-            ESP_LOGE(TAG, "out-of-memory");
+            LOGE(TAG, "out-of-memory");
             goto error_out;
         }
         conn->exi_out.iso2EXIDocument =
             static_cast<struct iso2_exiDocument*>(calloc(1, sizeof(struct iso2_exiDocument)));
         if (conn->exi_out.iso2EXIDocument == NULL) {
-            ESP_LOGE(TAG, "out-of-memory");
+            LOGE(TAG, "out-of-memory");
             goto error_out;
         }
         break;
@@ -470,10 +470,10 @@ int v2g_handle_connection(struct v2g_connection* conn) {
         rv = v2g_incoming_v2gtp(conn);
 
         if (rv == 1) {
-            ESP_LOGE(TAG, "Timeout waiting for next request or peer closed connection");
+            LOGE(TAG, "Timeout waiting for next request or peer closed connection");
             break;
         } else if (rv == -1) {
-            ESP_LOGE(TAG, "v2g_incoming_v2gtp() (previous message \"%s\") failed",
+            LOGE(TAG, "v2g_incoming_v2gtp() (previous message \"%s\") failed",
                  v2g_msg_type[conn->ctx->last_v2g_msg]);
             break;
         }
@@ -488,7 +488,7 @@ int v2g_handle_connection(struct v2g_connection* conn) {
             memset(conn->exi_in.dinEXIDocument, 0, sizeof(struct din_exiDocument));
             rv = decode_din_exiDocument(&conn->stream, conn->exi_in.dinEXIDocument);
             if (rv != 0) {
-                ESP_LOGE(TAG, "decode_dinExiDocument() (previous message \"%s\") failed: %d",
+                LOGE(TAG, "decode_dinExiDocument() (previous message \"%s\") failed: %d",
                      v2g_msg_type[conn->ctx->last_v2g_msg], rv);
                 /* we must ignore packet which we cannot decode, so reset rv to zero to stay in loop */
                 rv = 0;
@@ -505,7 +505,7 @@ int v2g_handle_connection(struct v2g_connection* conn) {
             memset(conn->exi_in.iso2EXIDocument, 0, sizeof(struct iso2_exiDocument));
             rv = decode_iso2_exiDocument(&conn->stream, conn->exi_in.iso2EXIDocument);
             if (rv != 0) {
-                ESP_LOGE(TAG, "decode_iso2_exiDocument() (previous message \"%s\") failed: %d",
+                LOGE(TAG, "decode_iso2_exiDocument() (previous message \"%s\") failed: %d",
                      v2g_msg_type[conn->ctx->last_v2g_msg], rv);
                 /* we must ignore packet which we cannot decode, so reset rv to zero to stay in loop */
                 rv = 0;
@@ -542,13 +542,13 @@ int v2g_handle_connection(struct v2g_connection* conn) {
             case V2G_PROTO_DIN70121:
             case V2G_PROTO_ISO15118_2010:
                 if ((rv = encode_din_exiDocument(&conn->stream, conn->exi_out.dinEXIDocument)) != 0) {
-                    ESP_LOGE(TAG, "encode_dinExiDocument() (message \"%s\") failed: %d",
+                    LOGE(TAG, "encode_dinExiDocument() (message \"%s\") failed: %d",
                          v2g_msg_type[conn->ctx->current_v2g_msg], rv);
                 }
                 break;
             case V2G_PROTO_ISO15118_2013:
                 if ((rv = encode_iso2_exiDocument(&conn->stream, conn->exi_out.iso2EXIDocument)) != 0) {
-                    ESP_LOGE(TAG, "encode_iso2_exiDocument() (message \"%s\") failed: %d",
+                    LOGE(TAG, "encode_iso2_exiDocument() (message \"%s\") failed: %d",
                          v2g_msg_type[conn->ctx->current_v2g_msg], rv);
                 }
                 break;
@@ -559,10 +559,10 @@ int v2g_handle_connection(struct v2g_connection* conn) {
             int64_t time_to_conf_res = getmonotonictime() - start_time;
 
             if (time_to_conf_res < MAX_RES_TIME) {
-                // ESP_LOGE(TAG, "time_to_conf_res %llu", time_to_conf_res);
+                // LOGE(TAG, "time_to_conf_res %llu", time_to_conf_res);
                 std::this_thread::sleep_for(std::chrono::microseconds((MAX_RES_TIME - time_to_conf_res) * 1000));
             } else {
-                ESP_LOGW(TAG, "Response message (type %d) not configured within %d ms (took %" PRIi64 " ms)",
+                LOGW(TAG, "Response message (type %d) not configured within %d ms (took %" PRIi64 " ms)",
                      conn->ctx->current_v2g_msg, MAX_RES_TIME, time_to_conf_res);
             }
         }
@@ -574,19 +574,19 @@ int v2g_handle_connection(struct v2g_connection* conn) {
 
             /* Write header and send next res-msg */
             if ((rv != 0) || ((rv = v2g_outgoing_v2gtp(conn)) == -1)) {
-                ESP_LOGE(TAG, "v2g_outgoing_v2gtp() \"%s\" failed: %d",
+                LOGE(TAG, "v2g_outgoing_v2gtp() \"%s\" failed: %d",
                      v2g_msg_type[conn->ctx->current_v2g_msg], rv);
                 break;
             }
             break;
         }
         case V2G_EVENT_IGNORE_MSG:
-            ESP_LOGE(TAG, "Ignoring V2G request message \"%s\". Waiting for next request",
+            LOGE(TAG, "Ignoring V2G request message \"%s\". Waiting for next request",
                  v2g_msg_type[conn->ctx->current_v2g_msg]);
             break;
         case V2G_EVENT_TERMINATE_CONNECTION: // fall-through intended
         default:
-            ESP_LOGE(TAG, "Failed to handle V2G request message \"%s\"",
+            LOGE(TAG, "Failed to handle V2G request message \"%s\"",
                  v2g_msg_type[conn->ctx->current_v2g_msg]);
             stop_receiving_loop = true;
             break;

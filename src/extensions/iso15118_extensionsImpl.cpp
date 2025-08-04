@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Copyright Pionix GmbH and Contributors to EVerest
 #include <extensions/iso15118_extensionsImpl.hpp>
-#include "esp_log.h"
+#include "logging.hpp"
 #include <v2g_ctx.hpp>
 #include <freertos_sync.hpp>
 
@@ -12,7 +12,7 @@ namespace extensions {
 
 void iso15118_extensionsImpl::init() {
     if (!v2g_ctx) {
-        ESP_LOGE(TAG, "v2g_ctx not created");
+        LOGE(TAG, "v2g_ctx not created");
         return;
     }
 }

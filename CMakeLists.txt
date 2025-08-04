@@ -48,7 +48,7 @@ target_sources(${MODULE_NAME}
         "iso_server.cpp"
         "din_server.cpp"
         "utils/session_utils.cpp"
-        "esp_log.c"
+        "logging.cpp"
         "sdp.cpp"
         "tools.cpp"
         "v2g_ctx.cpp"
