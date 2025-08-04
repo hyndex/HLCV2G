@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 #include <connection/tls_connection.hpp>
 #include <connection/connection.hpp>
-#include "esp_log.h"
+#include "logging.hpp"
 #include "v2g.hpp"
 #include <mbedtls/ssl.h>
 #include <mbedtls/net_sockets.h>

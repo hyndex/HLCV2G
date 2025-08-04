@@ -21,7 +21,7 @@ using namespace mbedtls_util;
 using namespace crypto::mbedtls;
 
 #include <iso_server.hpp>
-#include "esp_log.h"
+#include "logging.hpp"
 #include <tools.hpp>
 #include <v2g_ctx.hpp>
 #include <v2g_server.hpp>
@@ -95,7 +95,7 @@ static v2g_event iso_validate_response_code(iso2_responseCodeType* const v2g_res
     iso2_responseCodeType response_code_tmp;
 
     if (conn->ctx->is_connection_terminated == true) {
-        ESP_LOGE(TAG, "Connection is terminated. Abort charging");
+        LOGE(TAG, "Connection is terminated. Abort charging");
         return V2G_EVENT_TERMINATE_CONNECTION;
     }
 
@@ -122,7 +122,7 @@ static v2g_event iso_validate_response_code(iso2_responseCodeType* const v2g_res
     /* log failed response code message */
     if ((*v2g_response_code >= iso2_responseCodeType_FAILED) &&
         (*v2g_response_code <= iso2_responseCodeType_FAILED_CertificateRevoked)) {
-        ESP_LOGE(TAG, "Failed response code detected for message \"%s\", error: %s",
+        LOGE(TAG, "Failed response code detected for message \"%s\", error: %s",
              v2g_msg_type[conn->ctx->current_v2g_msg], isoResponse[*v2g_response_code]);
     }
 
@@ -203,7 +203,7 @@ static void check_iso2_charging_profile_values(iso2_PowerDeliveryReqType* req, i
                         res->ResponseCode = iso2_responseCodeType_FAILED_ChargingProfileInvalid; // [V2G2-224]
                         // [V2G2-225] [V2G2-478]
                         //  setting response code is commented because some EVs do not support schedules correctly
-                        ESP_LOGW(TAG, "EV's charging profile is invalid (ChargingProfileEntryMaxPower too high)!");
+                        LOGW(TAG, "EV's charging profile is invalid (ChargingProfileEntryMaxPower too high)!");
                         break;
                     }
                 }
@@ -212,7 +212,7 @@ static void check_iso2_charging_profile_values(iso2_PowerDeliveryReqType* req, i
                     // res->ResponseCode = iso2_responseCodeType_FAILED_ChargingProfileInvalid; // EV charing profile
                     // time exceeds EVSE provided schedule
                     //  setting response code is commented because some EVs do not support schedules correctly
-                    ESP_LOGW(TAG, "EV's charging profile is invalid (EV charging profile time exceeds provided schedule)!");
+                    LOGW(TAG, "EV's charging profile is invalid (EV charging profile time exceeds provided schedule)!");
                 } else {
                     /* Now we checked if the current EV interval fits within the EVSE interval, but it fails.
                      * Next step is to check the EVSE interval until we reached the last EVSE interval */
@@ -518,11 +518,11 @@ static bool publish_iso_certificate_installation_exi_req(struct v2g_context* ctx
 
     certificate_request.exi_request = mbedtls_util::base64_encode(AExiBuffer, AExiBufferSize);
     if (certificate_request.exi_request.size() > MQTT_MAX_PAYLOAD_SIZE) {
-        ESP_LOGE(TAG, "Mqtt payload size exceeded!");
+        LOGE(TAG, "Mqtt payload size exceeded!");
         return false;
     }
     if (certificate_request.exi_request.size() == 0) {
-        ESP_LOGE(TAG, "Unable to encode contract leaf certificate");
+        LOGE(TAG, "Unable to encode contract leaf certificate");
         return false;
     }
 
@@ -547,11 +547,11 @@ static bool publish_iso_certificate_update_exi_req(struct v2g_context* ctx, uint
 
     certificate_request.exi_request = mbedtls_util::base64_encode(AExiBuffer, AExiBufferSize);
     if (certificate_request.exi_request.size() > MQTT_MAX_PAYLOAD_SIZE) {
-        ESP_LOGE(TAG, "Mqtt payload size exceeded!");
+        LOGE(TAG, "Mqtt payload size exceeded!");
         return false;
     }
     if (certificate_request.exi_request.size() == 0) {
-        ESP_LOGE(TAG, "Unable to encode contract leaf certificate");
+        LOGE(TAG, "Unable to encode contract leaf certificate");
         return false;
     }
 
@@ -588,7 +588,7 @@ static enum v2g_event handle_iso_session_setup(struct v2g_connection* conn) {
 
     conn->ctx->p_charger->publish_evcc_id(buffer); // publish EVCC ID
 
-    ESP_LOGI(TAG, "SessionSetupReq.EVCCID: %s", std::string(buffer).size() ? buffer : "(zero length provided)");
+    LOGI(TAG, "SessionSetupReq.EVCCID: %s", std::string(buffer).size() ? buffer : "(zero length provided)");
 
     /* [V2G2-756]: If the SECC receives a SessionSetupReq including a SessionID value which is not
      * equal to zero (0) and not equal to the SessionID value stored from the preceding V2G
@@ -607,13 +607,13 @@ static enum v2g_event handle_iso_session_setup(struct v2g_connection* conn) {
     srand((unsigned int)time(NULL));
     if (known_session) {
         if (conn->ctx->hlc_pause_active) {
-            ESP_LOGI(TAG, "Found Session_id from the old session: 0x%08" PRIu64,
+            LOGI(TAG, "Found Session_id from the old session: 0x%08" PRIu64,
                      conn->ctx->evse_v2g_data.session_id);
             res->ResponseCode = iso2_responseCodeType_OK_OldSessionJoined;
             resume_session = true;
             conn->ctx->hlc_pause_active = false; // clear pause flag on resume
         } else {
-            ESP_LOGW(TAG, "Received known SessionID but no paused session. Rejecting resumption");
+            LOGW(TAG, "Received known SessionID but no paused session. Rejecting resumption");
             res->ResponseCode = iso2_responseCodeType_FAILED_UnknownSession;
             conn->ctx->evse_v2g_data.session_id = 0;
         }
@@ -627,9 +627,9 @@ static enum v2g_event handle_iso_session_setup(struct v2g_connection* conn) {
                 conn->ctx->evse_v2g_data.session_id != conn->ctx->ev_v2g_data.received_session_id) {
                 conn->ctx->evse_v2g_data.session_id = ((uint64_t)rand() << 48) | ((uint64_t)rand() << 32) |
                                                      ((uint64_t)rand() << 16) | (uint64_t)rand();
-                ESP_LOGI(TAG,
+                LOGI(TAG,
                          "No session_id found or not equal to the id from the preceding v2g session. Generating random session id.");
-                ESP_LOGI(TAG, "Created new session with id 0x%08" PRIu64,
+                LOGI(TAG, "Created new session with id 0x%08" PRIu64,
                          conn->ctx->evse_v2g_data.session_id);
             }
         }
@@ -673,12 +673,12 @@ static enum v2g_event handle_iso_service_discovery(struct v2g_connection* conn) 
 
     // Checking of the charge service id
     if (conn->ctx->evse_v2g_data.charge_service.ServiceID != V2G_SERVICE_ID_CHARGING) {
-        ESP_LOGW(TAG, "Selected ServiceID is not ISO15118 conform. Correcting value to '1' (Charge service id)");
+        LOGW(TAG, "Selected ServiceID is not ISO15118 conform. Correcting value to '1' (Charge service id)");
         conn->ctx->evse_v2g_data.charge_service.ServiceID = V2G_SERVICE_ID_CHARGING;
     }
     // Checking of the service category
     if (conn->ctx->evse_v2g_data.charge_service.ServiceCategory != iso2_serviceCategoryType_EVCharging) {
-        ESP_LOGW(TAG, "Selected ServiceCategory is not ISO15118 conform. Correcting value to '0' (EVCharging)");
+        LOGW(TAG, "Selected ServiceCategory is not ISO15118 conform. Correcting value to '0' (EVCharging)");
         conn->ctx->evse_v2g_data.charge_service.ServiceCategory = iso2_serviceCategoryType_EVCharging;
     }
 
@@ -690,7 +690,7 @@ static enum v2g_event handle_iso_service_discovery(struct v2g_connection* conn) 
          (conn->ctx->evse_v2g_data.payment_option_list[1] == iso2_paymentOptionType_Contract))) {
         conn->ctx->evse_v2g_data.payment_option_list[0] = iso2_paymentOptionType_ExternalPayment;
         conn->ctx->evse_v2g_data.payment_option_list_len = 1;
-        ESP_LOGW(TAG, "PnC is not allowed without TLS-communication. Correcting value to '1' (ExternalPayment)");
+        LOGW(TAG, "PnC is not allowed without TLS-communication. Correcting value to '1' (ExternalPayment)");
     }
 
     memcpy(res->PaymentOptionList.PaymentOption.array, conn->ctx->evse_v2g_data.payment_option_list,
@@ -845,7 +845,7 @@ static enum v2g_event handle_iso_payment_service_selection(struct v2g_connection
                 if (req->SelectedServiceList.SelectedService.array[req_idx].ServiceID ==
                     conn->ctx->evse_v2g_data.evse_service_list[ci_idx].ServiceID) {
                     /* If it's stored, search for the next requested SelectedService entry */
-                    ESP_LOGI(TAG, "Selected service id %i found",
+                    LOGI(TAG, "Selected service id %i found",
                          conn->ctx->evse_v2g_data.evse_service_list[ci_idx].ServiceID);
 
                     if (conn->ctx->evse_v2g_data.evse_service_list[ci_idx].ServiceID == SAE_V2H) {
@@ -878,14 +878,14 @@ static enum v2g_event handle_iso_payment_service_selection(struct v2g_connection
     next_event = (v2g_event)iso_validate_response_code(&res->ResponseCode, conn);
 
     if (req->SelectedPaymentOption == iso2_paymentOptionType_Contract) {
-        ESP_LOGI(TAG, "SelectedPaymentOption: Contract");
+        LOGI(TAG, "SelectedPaymentOption: Contract");
         conn->ctx->session.iso_selected_payment_option = iso2_paymentOptionType_Contract;
         /* Set next expected req msg */
         conn->ctx->state =
             (int)iso_dc_state_id::WAIT_FOR_PAYMENTDETAILS_CERTINST_CERTUPD; // [V2G-551] (iso specification describes
                                                                             // only the ac case... )
     } else {
-        ESP_LOGI(TAG, "SelectedPaymentOption: ExternalPayment");
+        LOGI(TAG, "SelectedPaymentOption: ExternalPayment");
         conn->ctx->evse_v2g_data.evse_processing[PHASE_AUTH] =
             (uint8_t)iso2_EVSEProcessingType_Ongoing_WaitingForCustomerInteraction; // [V2G2-854]
         /* Set next expected req msg */
@@ -924,7 +924,7 @@ static enum v2g_event handle_iso_payment_details(struct v2g_connection* conn) {
             err = parse_contract_certificate(contract_crt, req->ContractSignatureCertChain.Certificate.bytes,
                                              req->ContractSignatureCertChain.Certificate.bytesLen);
         } else {
-            ESP_LOGE(TAG, "No certificate received!");
+            LOGE(TAG, "No certificate received!");
             res->ResponseCode = iso2_responseCodeType_FAILED_CertChainError;
             goto error_out;
         }
@@ -936,11 +936,11 @@ static enum v2g_event handle_iso_payment_details(struct v2g_connection* conn) {
         cert_emaid.erase(std::remove(cert_emaid.begin(), cert_emaid.end(), '-'), cert_emaid.end());
         req_emaid.erase(std::remove(req_emaid.begin(), req_emaid.end(), '-'), req_emaid.end());
 
-        ESP_LOGV(TAG, "emaid-v2g: %s emaid-cert: %s", req_emaid.c_str(), cert_emaid.c_str());
+        LOGV(TAG, "emaid-v2g: %s emaid-cert: %s", req_emaid.c_str(), cert_emaid.c_str());
 
         if ((req_emaid.size() != cert_emaid.size()) ||
             (strncasecmp(req_emaid.c_str(), cert_emaid.c_str(), req_emaid.size()) != 0)) {
-            ESP_LOGE(TAG, "emaid of the contract certificate doesn't match with the received v2g-emaid");
+            LOGE(TAG, "emaid of the contract certificate doesn't match with the received v2g-emaid");
             res->ResponseCode = iso2_responseCodeType_FAILED_CertChainError;
             goto error_out;
         }
@@ -1031,19 +1031,19 @@ static enum v2g_event handle_iso_payment_details(struct v2g_connection* conn) {
             }
 
             if (err == -1) {
-                ESP_LOGE(TAG, "Validation of the contract certificate failed!");
+                LOGE(TAG, "Validation of the contract certificate failed!");
                 if (!forward_contract) {
-                    ESP_LOGE(TAG, "Central contract validation is not allowed.");
+                    LOGE(TAG, "Central contract validation is not allowed.");
                     // EVSETimeStamp and GenChallenge are mandatory, GenChallenge has fixed size
                     res->EVSETimeStamp = time(NULL);
                     memset(res->GenChallenge.bytes, 0, GEN_CHALLENGE_SIZE);
                     res->GenChallenge.bytesLen = GEN_CHALLENGE_SIZE;
                     goto error_out;
                 } else {
-                    ESP_LOGI(TAG, "Central contract validation is allowed: Forwarding contract");
+                    LOGI(TAG, "Central contract validation is allowed: Forwarding contract");
                 }
             } else {
-                ESP_LOGI(TAG, "Validation of the contract certificate was successful!");
+                LOGI(TAG, "Validation of the contract certificate was successful!");
 
                 // contract chain ocsp data can only be retrieved if the MO root is present and the chain could be
                 // verified
@@ -1108,12 +1108,12 @@ static enum v2g_event handle_iso_authorization(struct v2g_connection* conn) {
         if (req->GenChallenge_isUsed == 0 ||
             req->GenChallenge.bytesLen != 16 // [V2G2-697]  The GenChallenge field shall be exactly 128 bits long.
             || memcmp(req->GenChallenge.bytes, conn->ctx->session.gen_challenge, 16) != 0) {
-            ESP_LOGE(TAG, "Challenge invalid or not present");
+            LOGE(TAG, "Challenge invalid or not present");
             res->ResponseCode = iso2_responseCodeType_FAILED_ChallengeInvalid; // [V2G2-475]
             goto error_out;
         }
         if (conn->exi_in.iso2EXIDocument->V2G_Message.Header.Signature_isUsed == 0) {
-            ESP_LOGE(TAG, "Missing signature (Signature_isUsed == 0)");
+            LOGE(TAG, "Missing signature (Signature_isUsed == 0)");
             res->ResponseCode = iso2_responseCodeType_FAILED_SignatureError;
             goto error_out;
         }
@@ -1139,7 +1139,7 @@ static enum v2g_event handle_iso_authorization(struct v2g_connection* conn) {
         } else {
             // this should never happen, since the contract certificate is set in handle_iso_payment_details in case
             // contract is selected
-            ESP_LOGE(TAG, "No contract certificate could be retrieved!");
+            LOGE(TAG, "No contract certificate could be retrieved!");
             res->ResponseCode = iso2_responseCodeType_FAILED;
             goto error_out;
         }
@@ -1149,7 +1149,7 @@ static enum v2g_event handle_iso_authorization(struct v2g_connection* conn) {
     if (conn->ctx->evse_v2g_data.evse_processing[PHASE_AUTH] != iso2_EVSEProcessingType_Finished) {
         if (((is_payment_option_contract == false) && (conn->ctx->session.auth_timeout_eim == 0)) ||
             ((is_payment_option_contract == true) && (conn->ctx->session.auth_timeout_pnc == 0))) {
-            ESP_LOGD(TAG, "Waiting for authorization forever!");
+            LOGD(TAG, "Waiting for authorization forever!");
         } else if ((getmonotonictime() - conn->ctx->session.auth_start_timeout) >=
                    1000 * (is_payment_option_contract ? conn->ctx->session.auth_timeout_pnc
                                                       : conn->ctx->session.auth_timeout_eim)) {
@@ -1254,7 +1254,7 @@ static enum v2g_event handle_iso_charge_parameter_discovery(struct v2g_connectio
 
         if ((req->MaxEntriesSAScheduleTuple_isUsed == (unsigned int)1) &&
             (req->MaxEntriesSAScheduleTuple < res->SAScheduleList.SAScheduleTuple.arrayLen)) {
-            ESP_LOGW(TAG, "EV's max. SA-schedule-tuple entries exceeded");
+            LOGW(TAG, "EV's max. SA-schedule-tuple entries exceeded");
         }
     } else {
         res->EVSEProcessing = iso2_EVSEProcessingType_Ongoing;
@@ -1264,7 +1264,7 @@ static enum v2g_event handle_iso_charge_parameter_discovery(struct v2g_connectio
     /* Checking SAScheduleTupleID */
     for (uint8_t idx = 0; idx < res->SAScheduleList.SAScheduleTuple.arrayLen; idx++) {
         if (res->SAScheduleList.SAScheduleTuple.array[idx].SAScheduleTupleID == (uint8_t)0) {
-            ESP_LOGW(TAG, "Selected SAScheduleTupleID is not ISO15118 conform. The SECC shall use the "
+            LOGW(TAG, "Selected SAScheduleTupleID is not ISO15118 conform. The SECC shall use the "
                                      "values 1 to 255"); // [V2G2-773]  The SECC shall use the values 1 to 255 for the
                                                          // parameter SAScheduleTupleID.
         }
@@ -1274,7 +1274,7 @@ static enum v2g_event handle_iso_charge_parameter_discovery(struct v2g_connectio
 
     if (conn->ctx->is_dc_charger == true) {
         if (!wait_for_cp_state(conn->ctx, CP_STATE_B, V2G_CPSTATE_DETECTION_TIMEOUT)) {
-            ESP_LOGE(TAG, "timeout waiting for CP state B");
+            LOGE(TAG, "timeout waiting for CP state B");
             conn->ctx->intl_emergency_shutdown = true;
         }
     }
@@ -1315,7 +1315,7 @@ static enum v2g_event handle_iso_charge_parameter_discovery(struct v2g_connectio
                          pow(10, res->SAScheduleList.SAScheduleTuple.array[idx]
                                      .PMaxSchedule.PMaxScheduleEntry.array[idx2]
                                      .PMax.Multiplier)) > pmax) {
-                        ESP_LOGW(TAG, "Provided SA-schedule-list doesn't match with the physical value limits");
+                        LOGW(TAG, "Provided SA-schedule-list doesn't match with the physical value limits");
                     }
             }
         }
@@ -1455,7 +1455,7 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
 
         if (conn->ctx->is_dc_charger == false) {
             if (!wait_for_cp_states(conn->ctx, CP_STATE_C, CP_STATE_D, V2G_CP_STATE_B_TO_C_D_TIMEOUT_RELAXED)) {
-                ESP_LOGE(TAG, "timeout waiting for CP state C or D");
+                LOGE(TAG, "timeout waiting for CP state C or D");
                 res->ResponseCode = iso2_responseCodeType_FAILED_ContactorError;
             }
             if (conn->ctx->contactor_is_closed == false) {
@@ -1468,7 +1468,7 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
                 timespec_add_ms(&ts_abs_timeout, V2G_CONTACTOR_CLOSE_TIMEOUT);
 
                 /* wait for contactor to really close or timeout */
-                ESP_LOGI(TAG, "Waiting for contactor is closed");
+                LOGI(TAG, "Waiting for contactor is closed");
 
                 int rv = 0;
                 while ((rv == 0) && (conn->ctx->contactor_is_closed == false) &&
@@ -1479,7 +1479,7 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
                     if (rv == EINTR)
                         rv = 0; /* restart */
                     if (rv == ETIMEDOUT) {
-                        ESP_LOGE(TAG, "timeout while waiting for contactor to close, signaling error");
+                        LOGE(TAG, "timeout while waiting for contactor to close, signaling error");
                         res->ResponseCode = iso2_responseCodeType_FAILED_ContactorError;
                     }
                     frt_mutex_unlock(&conn->ctx->mqtt_lock);
@@ -1493,7 +1493,7 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
 
         if (conn->ctx->is_dc_charger == false) {
             if (!wait_for_cp_state(conn->ctx, CP_STATE_B, V2G_CP_STATE_C_D_TO_B_TIMEOUT)) {
-                ESP_LOGE(TAG, "timeout waiting for CP state B");
+                LOGE(TAG, "timeout waiting for CP state B");
                 res->ResponseCode = iso2_responseCodeType_FAILED_ContactorError;
             }
             conn->ctx->p_charger->publish_ac_open_contactor(nullptr);
@@ -1508,7 +1508,7 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
         break;
 
     default:
-        ESP_LOGE(TAG, "Unknown ChargeProgress %d received, signaling error", req->ChargeProgress);
+        LOGE(TAG, "Unknown ChargeProgress %d received, signaling error", req->ChargeProgress);
         res->ResponseCode = iso2_responseCodeType_FAILED;
     }
 
@@ -1681,17 +1681,17 @@ static enum v2g_event handle_iso_metering_receipt(struct v2g_connection* conn) {
     /* At first, publish the received ev request message to the MQTTinterface */
     publish_iso_metering_receipt_req(req);
 
-    ESP_LOGV(TAG, "EVSE side: meteringReceipt called");
-    ESP_LOGV(TAG, "\tReceived data:");
+    LOGV(TAG, "EVSE side: meteringReceipt called");
+    LOGV(TAG, "\tReceived data:");
 
-    ESP_LOGV(TAG, "\t\t ID=%c%c%c", req->Id.characters[0], req->Id.characters[1], req->Id.characters[2]);
-    ESP_LOGV(TAG, "\t\t SAScheduleTupleID=%d", req->SAScheduleTupleID);
-    ESP_LOGV(TAG, "\t\t SessionID=%d", req->SessionID.bytes[1]);
-    ESP_LOGV(TAG, "\t\t MeterInfo.MeterStatus=%d", req->MeterInfo.MeterStatus);
-    ESP_LOGV(TAG, "\t\t MeterInfo.MeterID=%d", req->MeterInfo.MeterID.characters[0]);
-    ESP_LOGV(TAG, "\t\t MeterInfo.isused.MeterReading=%d", req->MeterInfo.MeterReading_isUsed);
-    ESP_LOGV(TAG, "\t\t MeterReading.Value=%lu", (long unsigned int)req->MeterInfo.MeterReading);
-    ESP_LOGV(TAG, "\t\t MeterInfo.TMeter=%li", (long int)req->MeterInfo.TMeter);
+    LOGV(TAG, "\t\t ID=%c%c%c", req->Id.characters[0], req->Id.characters[1], req->Id.characters[2]);
+    LOGV(TAG, "\t\t SAScheduleTupleID=%d", req->SAScheduleTupleID);
+    LOGV(TAG, "\t\t SessionID=%d", req->SessionID.bytes[1]);
+    LOGV(TAG, "\t\t MeterInfo.MeterStatus=%d", req->MeterInfo.MeterStatus);
+    LOGV(TAG, "\t\t MeterInfo.MeterID=%d", req->MeterInfo.MeterID.characters[0]);
+    LOGV(TAG, "\t\t MeterInfo.isused.MeterReading=%d", req->MeterInfo.MeterReading_isUsed);
+    LOGV(TAG, "\t\t MeterReading.Value=%lu", (long unsigned int)req->MeterInfo.MeterReading);
+    LOGV(TAG, "\t\t MeterInfo.TMeter=%li", (long int)req->MeterInfo.TMeter);
 
     res->ResponseCode = iso2_responseCodeType_OK;
 
@@ -1734,14 +1734,14 @@ static enum v2g_event handle_iso_certificate_update(struct v2g_connection* conn)
     /* Publish the received EV request message to the MQTT interface */
     if (publish_iso_certificate_update_exi_req(conn->ctx, conn->buffer + V2GTP_HEADER_LENGTH,
                                                conn->stream.data_size - V2GTP_HEADER_LENGTH) == false) {
-        ESP_LOGE(TAG, "Failed to send CertificateUpdateExiReq");
+        LOGE(TAG, "Failed to send CertificateUpdateExiReq");
         goto exit;
     }
 
     /* Waiting for the CertUpdateExiRes msg */
     clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
     timespec_add_ms(&ts_abs_timeout, V2G_SECC_MSG_CERTINSTALL_TIME);
-    ESP_LOGI(TAG, "Waiting for the CertUpdateExiRes msg");
+    LOGI(TAG, "Waiting for the CertUpdateExiRes msg");
     while ((rv == 0) && (conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == true) &&
            (conn->ctx->intl_emergency_shutdown == false) && (conn->ctx->stop_hlc == false) &&
            (conn->ctx->is_connection_terminated == false)) { // [V2G2-917]
@@ -1750,7 +1750,7 @@ static enum v2g_event handle_iso_certificate_update(struct v2g_connection* conn)
         if (rv == EINTR)
             rv = 0; /* restart */
         if (rv == ETIMEDOUT) {
-            ESP_LOGE(TAG, "CertificateUpdateRes timeout occurred");
+            LOGE(TAG, "CertificateUpdateRes timeout occurred");
             conn->ctx->intl_emergency_shutdown = true; // [V2G2-918]
         }
         frt_mutex_unlock(&conn->ctx->mqtt_lock);
@@ -1762,7 +1762,7 @@ static enum v2g_event handle_iso_certificate_update(struct v2g_connection* conn)
             mbedtls_util::base64_decode(conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.data(),
                                          conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.size());
         if (data.empty() || (data.size() > DEFAULT_BUFFER_SIZE)) {
-            ESP_LOGE(TAG, "Failed to decode base64 stream");
+            LOGE(TAG, "Failed to decode base64 stream");
             goto exit;
         } else {
             std::memcpy(conn->buffer + V2GTP_HEADER_LENGTH, data.data(), data.size());
@@ -1804,13 +1804,13 @@ static enum v2g_event handle_iso_certificate_installation(struct v2g_connection*
     /* At first, publish the received EV request message to the customer MQTT interface */
     if (publish_iso_certificate_installation_exi_req(conn->ctx, conn->buffer + V2GTP_HEADER_LENGTH,
                                                      conn->stream.data_size - V2GTP_HEADER_LENGTH) == false) {
-        ESP_LOGE(TAG, "Failed to send CertificateInstallationExiReq");
+        LOGE(TAG, "Failed to send CertificateInstallationExiReq");
         goto exit;
     }
     /* Waiting for the CertInstallationExiRes msg */
     clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
     timespec_add_ms(&ts_abs_timeout, V2G_SECC_MSG_CERTINSTALL_TIME);
-    ESP_LOGI(TAG, "Waiting for the CertInstallationExiRes msg");
+    LOGI(TAG, "Waiting for the CertInstallationExiRes msg");
     while ((rv == 0) && (conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == true) &&
            (conn->ctx->intl_emergency_shutdown == false) && (conn->ctx->stop_hlc == false) &&
            (conn->ctx->is_connection_terminated == false)) { // [V2G2-917]
@@ -1819,7 +1819,7 @@ static enum v2g_event handle_iso_certificate_installation(struct v2g_connection*
         if (rv == EINTR)
             rv = 0; /* restart */
         if (rv == ETIMEDOUT) {
-            ESP_LOGE(TAG, "CertificateInstallationRes timeout occurred");
+            LOGE(TAG, "CertificateInstallationRes timeout occurred");
             conn->ctx->intl_emergency_shutdown = true; // [V2G2-918] Initiating emergency shutdown, response code faild
                                                        // will be set in iso_validate_response_code() function
         }
@@ -1831,7 +1831,7 @@ static enum v2g_event handle_iso_certificate_installation(struct v2g_connection*
         const auto data = mbedtls_util::base64_decode(conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.data(),
                                                  conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.size());
         if (data.empty() || (data.size() > DEFAULT_BUFFER_SIZE)) {
-            ESP_LOGE(TAG, "Failed to decode base64 stream");
+            LOGE(TAG, "Failed to decode base64 stream");
             goto exit;
         } else {
             std::memcpy(conn->buffer + V2GTP_HEADER_LENGTH, data.data(), data.size());
@@ -1877,7 +1877,7 @@ static enum v2g_event handle_iso_cable_check(struct v2g_connection* conn) {
     publish_DcEvStatus(conn->ctx, req->DC_EVStatus);
 
     if (!wait_for_cp_states(conn->ctx, CP_STATE_C, CP_STATE_D, V2G_CPSTATE_DETECTION_TIMEOUT)) {
-        ESP_LOGE(TAG, "timeout waiting for CP state C or D");
+        LOGE(TAG, "timeout waiting for CP state C or D");
         conn->ctx->intl_emergency_shutdown = true;
     }
 
@@ -2040,7 +2040,7 @@ static enum v2g_event handle_iso_current_demand(struct v2g_connection* conn) {
             conn->ctx->evse_v2g_data.evse_maximum_power_limit.Value < 0) {
             if (req->EVTargetCurrent.Value > 0) {
                 if (req_pos_value_count++ >= 1) {
-                    ESP_LOGW(TAG, "SAE V2G Bidi handshake was not recognized by the ev side. Instead of "
+                    LOGW(TAG, "SAE V2G Bidi handshake was not recognized by the ev side. Instead of "
                                              "shutting down, it is better to wait for a correct response");
                     req_pos_value_count = 0;
                 } else {
@@ -2056,7 +2056,7 @@ static enum v2g_event handle_iso_current_demand(struct v2g_connection* conn) {
                    conn->ctx->evse_v2g_data.evse_maximum_power_limit.Value > 0) {
             if (req->EVTargetCurrent.Value < 0) {
                 if (req_pos_value_count++ >= 1) {
-                    ESP_LOGW(TAG, "SAE V2G Bidi handshake was not recognized by the ev side. Instead of "
+                    LOGW(TAG, "SAE V2G Bidi handshake was not recognized by the ev side. Instead of "
                                              "shutting down, it is better to wait for a correct response");
                     req_pos_value_count = 0;
                 } else {
@@ -2112,7 +2112,7 @@ static enum v2g_event handle_iso_welding_detection(struct v2g_connection* conn) 
     publish_iso_welding_detection_req(conn->ctx, req);
 
     if (!wait_for_cp_state(conn->ctx, CP_STATE_B, V2G_CPSTATE_DETECTION_TIMEOUT)) {
-        ESP_LOGE(TAG, "timeout waiting for CP state B");
+        LOGE(TAG, "timeout waiting for CP state B");
         conn->ctx->intl_emergency_shutdown = true; // [V2G2-920], [V2G2-921]
     }
 
@@ -2209,7 +2209,7 @@ enum v2g_event iso_handle_request(v2g_connection* conn) {
      * request a little bit
      */
     if (exi_in->V2G_Message.Body.CurrentDemandReq_isUsed) {
-        ESP_LOGV(TAG, "Handling CurrentDemandReq");
+        LOGV(TAG, "Handling CurrentDemandReq");
         if (conn->ctx->last_v2g_msg == V2G_POWER_DELIVERY_MSG) {
             conn->ctx->p_charger->publish_current_demand_started(nullptr);
             conn->ctx->session.is_charging = true;
@@ -2219,37 +2219,37 @@ enum v2g_event iso_handle_request(v2g_connection* conn) {
         init_iso2_CurrentDemandResType(&exi_out->V2G_Message.Body.CurrentDemandRes);
         next_v2g_event = handle_iso_current_demand(conn); //  [V2G2-592]
     } else if (exi_in->V2G_Message.Body.SessionSetupReq_isUsed) {
-        ESP_LOGV(TAG, "Handling SessionSetupReq");
+        LOGV(TAG, "Handling SessionSetupReq");
         conn->ctx->current_v2g_msg = V2G_SESSION_SETUP_MSG;
         exi_out->V2G_Message.Body.SessionSetupRes_isUsed = 1u;
         init_iso2_SessionSetupResType(&exi_out->V2G_Message.Body.SessionSetupRes);
         next_v2g_event = handle_iso_session_setup(conn); // [V2G2-542]
     } else if (exi_in->V2G_Message.Body.ServiceDiscoveryReq_isUsed) {
-        ESP_LOGV(TAG, "Handling ServiceDiscoveryReq");
+        LOGV(TAG, "Handling ServiceDiscoveryReq");
         conn->ctx->current_v2g_msg = V2G_SERVICE_DISCOVERY_MSG;
         exi_out->V2G_Message.Body.ServiceDiscoveryRes_isUsed = 1u;
         init_iso2_ServiceDiscoveryResType(&exi_out->V2G_Message.Body.ServiceDiscoveryRes);
         next_v2g_event = handle_iso_service_discovery(conn); // [V2G2-544]
     } else if (exi_in->V2G_Message.Body.ServiceDetailReq_isUsed) {
-        ESP_LOGV(TAG, "Handling ServiceDetailReq");
+        LOGV(TAG, "Handling ServiceDetailReq");
         conn->ctx->current_v2g_msg = V2G_SERVICE_DETAIL_MSG;
         exi_out->V2G_Message.Body.ServiceDetailRes_isUsed = 1u;
         init_iso2_ServiceDetailResType(&exi_out->V2G_Message.Body.ServiceDetailRes);
         next_v2g_event = handle_iso_service_detail(conn); // [V2G2-547]
     } else if (exi_in->V2G_Message.Body.PaymentServiceSelectionReq_isUsed) {
-        ESP_LOGV(TAG, "Handling PaymentServiceSelectionReq");
+        LOGV(TAG, "Handling PaymentServiceSelectionReq");
         conn->ctx->current_v2g_msg = V2G_PAYMENT_SERVICE_SELECTION_MSG;
         exi_out->V2G_Message.Body.PaymentServiceSelectionRes_isUsed = 1u;
         init_iso2_PaymentServiceSelectionResType(&exi_out->V2G_Message.Body.PaymentServiceSelectionRes);
         next_v2g_event = handle_iso_payment_service_selection(conn); // [V2G2-550]
     } else if (exi_in->V2G_Message.Body.PaymentDetailsReq_isUsed) {
-        ESP_LOGV(TAG, "Handling PaymentDetailsReq");
+        LOGV(TAG, "Handling PaymentDetailsReq");
         conn->ctx->current_v2g_msg = V2G_PAYMENT_DETAILS_MSG;
         exi_out->V2G_Message.Body.PaymentDetailsRes_isUsed = 1u;
         init_iso2_PaymentDetailsResType(&exi_out->V2G_Message.Body.PaymentDetailsRes);
         next_v2g_event = handle_iso_payment_details(conn); // [V2G2-559]
     } else if (exi_in->V2G_Message.Body.AuthorizationReq_isUsed) {
-        ESP_LOGV(TAG, "Handling AuthorizationReq");
+        LOGV(TAG, "Handling AuthorizationReq");
         conn->ctx->current_v2g_msg = V2G_AUTHORIZATION_MSG;
         if (conn->ctx->last_v2g_msg != V2G_AUTHORIZATION_MSG) {
             if (conn->ctx->session.iso_selected_payment_option == iso2_paymentOptionType_ExternalPayment) {
@@ -2260,50 +2260,50 @@ enum v2g_event iso_handle_request(v2g_connection* conn) {
         init_iso2_AuthorizationResType(&exi_out->V2G_Message.Body.AuthorizationRes);
         next_v2g_event = handle_iso_authorization(conn); // [V2G2-562]
     } else if (exi_in->V2G_Message.Body.ChargeParameterDiscoveryReq_isUsed) {
-        ESP_LOGV(TAG, "Handling ChargeParameterDiscoveryReq");
+        LOGV(TAG, "Handling ChargeParameterDiscoveryReq");
         conn->ctx->current_v2g_msg = V2G_CHARGE_PARAMETER_DISCOVERY_MSG;
         if (conn->ctx->last_v2g_msg == V2G_AUTHORIZATION_MSG) {
-            ESP_LOGI(TAG, "Parameter-phase started");
+            LOGI(TAG, "Parameter-phase started");
         }
         exi_out->V2G_Message.Body.ChargeParameterDiscoveryRes_isUsed = 1u;
         init_iso2_ChargeParameterDiscoveryResType(&exi_out->V2G_Message.Body.ChargeParameterDiscoveryRes);
         next_v2g_event = handle_iso_charge_parameter_discovery(conn); // [V2G2-565]
     } else if (exi_in->V2G_Message.Body.PowerDeliveryReq_isUsed) {
-        ESP_LOGV(TAG, "Handling PowerDeliveryReq");
+        LOGV(TAG, "Handling PowerDeliveryReq");
         conn->ctx->current_v2g_msg = V2G_POWER_DELIVERY_MSG;
         exi_out->V2G_Message.Body.PowerDeliveryRes_isUsed = 1u;
         init_iso2_PowerDeliveryResType(&exi_out->V2G_Message.Body.PowerDeliveryRes);
         next_v2g_event = handle_iso_power_delivery(conn); // [V2G2-589]
     } else if (exi_in->V2G_Message.Body.ChargingStatusReq_isUsed) {
-        ESP_LOGV(TAG, "Handling ChargingStatusReq");
+        LOGV(TAG, "Handling ChargingStatusReq");
         conn->ctx->current_v2g_msg = V2G_CHARGING_STATUS_MSG;
 
         exi_out->V2G_Message.Body.ChargingStatusRes_isUsed = 1u;
         init_iso2_ChargingStatusResType(&exi_out->V2G_Message.Body.ChargingStatusRes);
         next_v2g_event = handle_iso_charging_status(conn);
     } else if (exi_in->V2G_Message.Body.MeteringReceiptReq_isUsed) {
-        ESP_LOGV(TAG, "Handling MeteringReceiptReq");
+        LOGV(TAG, "Handling MeteringReceiptReq");
         conn->ctx->current_v2g_msg = V2G_METERING_RECEIPT_MSG;
         exi_out->V2G_Message.Body.MeteringReceiptRes_isUsed = 1u;
         init_iso2_MeteringReceiptResType(&exi_out->V2G_Message.Body.MeteringReceiptRes);
         next_v2g_event = handle_iso_metering_receipt(conn); // [V2G2-796]
     } else if (exi_in->V2G_Message.Body.CertificateUpdateReq_isUsed) {
-        ESP_LOGV(TAG, "Handling CertificateUpdateReq");
+        LOGV(TAG, "Handling CertificateUpdateReq");
         conn->ctx->current_v2g_msg = V2G_CERTIFICATE_UPDATE_MSG;
 
         exi_out->V2G_Message.Body.CertificateUpdateRes_isUsed = 1u;
         init_iso2_CertificateUpdateResType(&exi_out->V2G_Message.Body.CertificateUpdateRes);
         next_v2g_event = handle_iso_certificate_update(conn); // [V2G2-556]
     } else if (exi_in->V2G_Message.Body.CertificateInstallationReq_isUsed) {
-        ESP_LOGV(TAG, "Handling CertificateInstallationReq");
+        LOGV(TAG, "Handling CertificateInstallationReq");
         conn->ctx->current_v2g_msg = V2G_CERTIFICATE_INSTALLATION_MSG;
-        ESP_LOGI(TAG, "CertificateInstallation-phase started");
+        LOGI(TAG, "CertificateInstallation-phase started");
 
         exi_out->V2G_Message.Body.CertificateInstallationRes_isUsed = 1u;
         init_iso2_CertificateInstallationResType(&exi_out->V2G_Message.Body.CertificateInstallationRes);
         next_v2g_event = handle_iso_certificate_installation(conn); // [V2G2-553]
     } else if (exi_in->V2G_Message.Body.CableCheckReq_isUsed) {
-        ESP_LOGV(TAG, "Handling CableCheckReq");
+        LOGV(TAG, "Handling CableCheckReq");
         conn->ctx->current_v2g_msg = V2G_CABLE_CHECK_MSG;
         /* At first send mqtt charging phase signal to the customer interface */
         if (V2G_CHARGE_PARAMETER_DISCOVERY_MSG == conn->ctx->last_v2g_msg) {
@@ -2314,37 +2314,37 @@ enum v2g_event iso_handle_request(v2g_connection* conn) {
         init_iso2_CableCheckResType(&exi_out->V2G_Message.Body.CableCheckRes);
         next_v2g_event = handle_iso_cable_check(conn); // [V2G2-583
     } else if (exi_in->V2G_Message.Body.PreChargeReq_isUsed) {
-        ESP_LOGV(TAG, "Handling PreChargeReq");
+        LOGV(TAG, "Handling PreChargeReq");
         conn->ctx->current_v2g_msg = V2G_PRE_CHARGE_MSG;
         /* At first send  mqtt charging phase signal to the customer interface */
         if (conn->ctx->last_v2g_msg == V2G_CABLE_CHECK_MSG) {
             conn->ctx->p_charger->publish_start_pre_charge(nullptr);
-            ESP_LOGI(TAG, "Precharge-phase started");
+            LOGI(TAG, "Precharge-phase started");
         }
 
         exi_out->V2G_Message.Body.PreChargeRes_isUsed = 1u;
         init_iso2_PreChargeResType(&exi_out->V2G_Message.Body.PreChargeRes);
         next_v2g_event = handle_iso_pre_charge(conn); // [V2G2-586]
     } else if (exi_in->V2G_Message.Body.WeldingDetectionReq_isUsed) {
-        ESP_LOGV(TAG, "Handling WeldingDetectionReq");
+        LOGV(TAG, "Handling WeldingDetectionReq");
         conn->ctx->current_v2g_msg = V2G_WELDING_DETECTION_MSG;
         if (conn->ctx->last_v2g_msg != V2G_WELDING_DETECTION_MSG) {
-            ESP_LOGI(TAG, "Welding-phase started");
+            LOGI(TAG, "Welding-phase started");
         }
         exi_out->V2G_Message.Body.WeldingDetectionRes_isUsed = 1u;
         init_iso2_WeldingDetectionResType(&exi_out->V2G_Message.Body.WeldingDetectionRes);
         next_v2g_event = handle_iso_welding_detection(conn); // [V2G2-596]
     } else if (exi_in->V2G_Message.Body.SessionStopReq_isUsed) {
-        ESP_LOGV(TAG, "Handling SessionStopReq");
+        LOGV(TAG, "Handling SessionStopReq");
         conn->ctx->current_v2g_msg = V2G_SESSION_STOP_MSG;
         exi_out->V2G_Message.Body.SessionStopRes_isUsed = 1u;
         init_iso2_SessionStopResType(&exi_out->V2G_Message.Body.SessionStopRes);
         next_v2g_event = handle_iso_session_stop(conn); // [V2G2-570]
     } else {
-        ESP_LOGE(TAG, "create_response_message: request type not found");
+        LOGE(TAG, "create_response_message: request type not found");
         next_v2g_event = V2G_EVENT_IGNORE_MSG;
     }
-    ESP_LOGV(TAG, "Current state: %s",
+    LOGV(TAG, "Current state: %s",
          conn->ctx->is_dc_charger ? iso_dc_states[conn->ctx->state].description
                                   : iso_ac_states[conn->ctx->state].description);
 

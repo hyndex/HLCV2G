@@ -2,7 +2,7 @@
 // Copyright (C) 2022-2023 chargebyte GmbH
 // Copyright (C) 2022-2023 Contributors to EVerest
 #include "sdp.hpp"
-#include "esp_log.h"
+#include "logging.hpp"
 
 #include <arpa/inet.h>
 #include <ifaddrs.h>
@@ -78,25 +78,25 @@ int sdp_validate_header(uint8_t* buffer, uint16_t expected_payload_type, uint32_
     uint32_t payload_len;
 
     if (buffer[0] != SDP_VERSION) {
-        ESP_LOGE(TAG, "Invalid SDP version");
+        LOGE(TAG, "Invalid SDP version");
         return -1;
     }
 
     if (buffer[1] != SDP_INVERSE_VERSION) {
-        ESP_LOGE(TAG, "Invalid SDP inverse version");
+        LOGE(TAG, "Invalid SDP inverse version");
         return -1;
     }
 
     payload_type = (buffer[2] << 8) + buffer[3];
     if (payload_type != expected_payload_type) {
-        ESP_LOGE(TAG, "Invalid payload type: expected %" PRIu16 ", received %" PRIu16, expected_payload_type,
+        LOGE(TAG, "Invalid payload type: expected %" PRIu16 ", received %" PRIu16, expected_payload_type,
              payload_type);
         return -1;
     }
 
     payload_len = (buffer[4] << 24) + (buffer[5] << 16) + (buffer[6] << 8) + buffer[7];
     if (payload_len != expected_payload_len) {
-        ESP_LOGE(TAG, "Invalid payload length: expected %" PRIu32 ", received %" PRIu32, expected_payload_len,
+        LOGE(TAG, "Invalid payload length: expected %" PRIu32 ", received %" PRIu32, expected_payload_len,
              payload_len);
         return -1;
     }
@@ -134,7 +134,7 @@ int sdp_send_response(int sdp_socket, struct sdp_query* sdp_query) {
 
     /* at the moment we only understand TCP protocol */
     if (sdp_query->proto_requested != SDP_TRANSPORT_PROTOCOL_TCP) {
-        ESP_LOGE(TAG, "SDP requested unsupported protocol 0x%02x, announcing nothing",
+        LOGE(TAG, "SDP requested unsupported protocol 0x%02x, announcing nothing",
              sdp_query->proto_requested);
         return 1;
     }
@@ -144,38 +144,38 @@ int sdp_send_response(int sdp_socket, struct sdp_query* sdp_query) {
     switch (sdp_query->security_requested) {
     case SDP_SECURITY_TLS:
         if (sdp_query->v2g_ctx->local_tls_addr and tls_server_available) {
-            ESP_LOGI(TAG, "SDP requested TLS, announcing TLS");
+            LOGI(TAG, "SDP requested TLS, announcing TLS");
             sdp_create_response(buffer, sdp_query->v2g_ctx->local_tls_addr, SDP_SECURITY_TLS,
                                 SDP_TRANSPORT_PROTOCOL_TCP);
             break;
         }
         if (sdp_query->v2g_ctx->local_tcp_addr) {
-            ESP_LOGI(TAG, "SDP requested TLS, announcing NO-TLS");
+            LOGI(TAG, "SDP requested TLS, announcing NO-TLS");
             sdp_create_response(buffer, sdp_query->v2g_ctx->local_tcp_addr, SDP_SECURITY_NONE,
                                 SDP_TRANSPORT_PROTOCOL_TCP);
             break;
         }
-        ESP_LOGE(TAG, "SDP requested TLS, announcing nothing");
+        LOGE(TAG, "SDP requested TLS, announcing nothing");
         return 1;
 
     case SDP_SECURITY_NONE:
         if (sdp_query->v2g_ctx->local_tcp_addr) {
-            ESP_LOGI(TAG, "SDP requested NO-TLS, announcing NO-TLS");
+            LOGI(TAG, "SDP requested NO-TLS, announcing NO-TLS");
             sdp_create_response(buffer, sdp_query->v2g_ctx->local_tcp_addr, SDP_SECURITY_NONE,
                                 SDP_TRANSPORT_PROTOCOL_TCP);
             break;
         }
         if (sdp_query->v2g_ctx->local_tls_addr and tls_server_available) {
-            ESP_LOGI(TAG, "SDP requested NO-TLS, announcing TLS");
+            LOGI(TAG, "SDP requested NO-TLS, announcing TLS");
             sdp_create_response(buffer, sdp_query->v2g_ctx->local_tls_addr, SDP_SECURITY_TLS,
                                 SDP_TRANSPORT_PROTOCOL_TCP);
             break;
         }
-        ESP_LOGE(TAG, "SDP requested NO-TLS, announcing nothing");
+        LOGE(TAG, "SDP requested NO-TLS, announcing nothing");
         return 1;
 
     default:
-        ESP_LOGE(TAG, "SDP requested unsupported security 0x%02x, announcing nothing",
+        LOGE(TAG, "SDP requested unsupported security 0x%02x, announcing nothing",
              sdp_query->security_requested);
         return 1;
     }
@@ -191,9 +191,9 @@ int sdp_send_response(int sdp_socket, struct sdp_query* sdp_query) {
 
         addr = inet_ntop(AF_INET6, &sdp_query->remote_addr.sin6_addr, addrbuf, sizeof(addrbuf));
         if (rv == 0) {
-            ESP_LOGI(TAG, "sendto([%s]:%" PRIu16 ") succeeded", addr, ntohs(sdp_query->remote_addr.sin6_port));
+            LOGI(TAG, "sendto([%s]:%" PRIu16 ") succeeded", addr, ntohs(sdp_query->remote_addr.sin6_port));
         } else {
-            ESP_LOGE(TAG, "sendto([%s]:%" PRIu16 ") failed: %s", addr, ntohs(sdp_query->remote_addr.sin6_port),
+            LOGE(TAG, "sendto([%s]:%" PRIu16 ") failed: %s", addr, ntohs(sdp_query->remote_addr.sin6_port),
                  strerror(saved_errno));
         }
     }
@@ -208,19 +208,19 @@ int sdp_init(struct v2g_context* v2g_ctx) {
 
     mreq.ipv6mr_interface = if_nametoindex(v2g_ctx->if_name);
     if (!mreq.ipv6mr_interface) {
-        ESP_LOGE(TAG, "No such interface: %s", v2g_ctx->if_name);
+        LOGE(TAG, "No such interface: %s", v2g_ctx->if_name);
         return -1;
     }
 
     /* create receiving socket */
     v2g_ctx->sdp_socket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
     if (v2g_ctx->sdp_socket == -1) {
-        ESP_LOGE(TAG, "socket() failed: %s", strerror(errno));
+        LOGE(TAG, "socket() failed: %s", strerror(errno));
         return -1;
     }
 
     if (setsockopt(v2g_ctx->sdp_socket, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable)) == -1) {
-        ESP_LOGE(TAG, "setsockopt(SO_REUSEPORT) failed: %s", strerror(errno));
+        LOGE(TAG, "setsockopt(SO_REUSEPORT) failed: %s", strerror(errno));
         close(v2g_ctx->sdp_socket);
         return -1;
     }
@@ -228,31 +228,31 @@ int sdp_init(struct v2g_context* v2g_ctx) {
     sdp_addr.sin6_addr = in6addr_any;
 
     if (bind(v2g_ctx->sdp_socket, (struct sockaddr*)&sdp_addr, sizeof(sdp_addr)) == -1) {
-        ESP_LOGE(TAG, "bind() failed: %s", strerror(errno));
+        LOGE(TAG, "bind() failed: %s", strerror(errno));
         close(v2g_ctx->sdp_socket);
         return -1;
     }
 
-    ESP_LOGI(TAG, "SDP socket setup succeeded");
+    LOGI(TAG, "SDP socket setup succeeded");
 
     /* bind only to specified device */
     if (setsockopt(v2g_ctx->sdp_socket, SOL_SOCKET, SO_BINDTODEVICE, v2g_ctx->if_name, strlen(v2g_ctx->if_name)) ==
         -1) {
-        ESP_LOGE(TAG, "setsockopt(SO_BINDTODEVICE) failed: %s", strerror(errno));
+        LOGE(TAG, "setsockopt(SO_BINDTODEVICE) failed: %s", strerror(errno));
         close(v2g_ctx->sdp_socket);
         return -1;
     }
 
-    ESP_LOGV(TAG, "bind only to specified device");
+    LOGV(TAG, "bind only to specified device");
 
     /* join multicast group */
     if (setsockopt(v2g_ctx->sdp_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) == -1) {
-        ESP_LOGE(TAG, "setsockopt(IPV6_JOIN_GROUP) failed: %s", strerror(errno));
+        LOGE(TAG, "setsockopt(IPV6_JOIN_GROUP) failed: %s", strerror(errno));
         close(v2g_ctx->sdp_socket);
         return -1;
     }
 
-    ESP_LOGV(TAG, "joined multicast group");
+    LOGV(TAG, "joined multicast group");
 
     return 0;
 }
@@ -277,7 +277,7 @@ int sdp_listen(struct v2g_context* v2g_ctx) {
             if (errno == EINTR) { // If the call did not succeed because it was interrupted
                 continue;
             } else {
-                ESP_LOGE(TAG, "poll() failed: %s", strerror(errno));
+                LOGE(TAG, "poll() failed: %s", strerror(errno));
                 continue;
             }
         }
@@ -287,20 +287,20 @@ int sdp_listen(struct v2g_context* v2g_ctx) {
                                    (struct sockaddr*)&sdp_query.remote_addr, &addrlen);
             if (len == -1) {
                 if (errno != EINTR)
-                    ESP_LOGE(TAG, "recvfrom() failed: %s", strerror(errno));
+                    LOGE(TAG, "recvfrom() failed: %s", strerror(errno));
                 continue;
             }
 
             addr = inet_ntop(AF_INET6, &sdp_query.remote_addr.sin6_addr, addrbuf, sizeof(addrbuf));
 
             if (len != sizeof(buffer)) {
-                ESP_LOGW(TAG, "Discarded packet from [%s]:%" PRIu16 " due to unexpected length %zd", addr,
+                LOGW(TAG, "Discarded packet from [%s]:%" PRIu16 " due to unexpected length %zd", addr,
                      ntohs(sdp_query.remote_addr.sin6_port), len);
                 continue;
             }
 
             if (sdp_validate_header(buffer, SDP_REQUEST_TYPE, SDP_REQUEST_PAYLOAD_LEN)) {
-                ESP_LOGW(TAG, "Packet with invalid SDP header received from [%s]:%" PRIu16, addr,
+                LOGW(TAG, "Packet with invalid SDP header received from [%s]:%" PRIu16, addr,
                      ntohs(sdp_query.remote_addr.sin6_port));
                 continue;
             }
@@ -308,7 +308,7 @@ int sdp_listen(struct v2g_context* v2g_ctx) {
             sdp_query.security_requested = (sdp_security)buffer[SDP_HEADER_LEN + 0];
             sdp_query.proto_requested = (sdp_transport_protocol)buffer[SDP_HEADER_LEN + 1];
 
-            ESP_LOGI(TAG, "Received packet from [%s]:%" PRIu16 " with security 0x%02x and protocol 0x%02x",
+            LOGI(TAG, "Received packet from [%s]:%" PRIu16 " with security 0x%02x and protocol 0x%02x",
                  addr, ntohs(sdp_query.remote_addr.sin6_port), sdp_query.security_requested, sdp_query.proto_requested);
 
             sdp_send_response(v2g_ctx->sdp_socket, &sdp_query);
@@ -316,7 +316,7 @@ int sdp_listen(struct v2g_context* v2g_ctx) {
     }
 
     if (close(v2g_ctx->sdp_socket) == -1) {
-        ESP_LOGE(TAG, "close() failed: %s", strerror(errno));
+        LOGE(TAG, "close() failed: %s", strerror(errno));
     }
 
     return 0;

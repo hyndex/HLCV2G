@@ -3,7 +3,7 @@
 // Copyright (C) 2022-2023 Contributors to EVerest
 
 #include <connection/connection.hpp>
-#include "esp_log.h"
+#include "logging.hpp"
 #include <connection/tls_connection.hpp>
 #include "tools.hpp"
 #include <v2g_server.hpp>
@@ -48,7 +48,7 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
     s = socket(AF_INET6, SOCK_STREAM, 0);
     if (s == -1) {
         if (!error_once) {
-            ESP_LOGE(TAG, "socket() failed: %s", strerror(errno));
+            LOGE(TAG, "socket() failed: %s", strerror(errno));
             error_once = true;
         }
         return -1;
@@ -56,7 +56,7 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
 
     if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable)) == -1) {
         if (!error_once) {
-            ESP_LOGE(TAG, "setsockopt(SO_REUSEPORT) failed: %s", strerror(errno));
+            LOGE(TAG, "setsockopt(SO_REUSEPORT) failed: %s", strerror(errno));
             error_once = true;
         }
         close(s);
@@ -66,8 +66,8 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
     /* bind it to interface */
     if (bind(s, reinterpret_cast<struct sockaddr*>(sockaddr), addrlen) == -1) {
         if (!error_once) {
-            ESP_LOGW(TAG, "bind() failed: %s", strerror(errno));
-            ESP_LOGW(TAG, "Verify that the configured interface has a valid IPv6 link local address configured.");
+            LOGW(TAG, "bind() failed: %s", strerror(errno));
+            LOGW(TAG, "Verify that the configured interface has a valid IPv6 link local address configured.");
             error_once = true;
         }
         close(s);
@@ -77,7 +77,7 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
     /* listen on this socket */
     if (listen(s, DEFAULT_SOCKET_BACKLOG) == -1) {
         if (!error_once) {
-            ESP_LOGE(TAG, "listen() failed: %s", strerror(errno));
+            LOGE(TAG, "listen() failed: %s", strerror(errno));
             error_once = true;
         }
         close(s);
@@ -87,7 +87,7 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
     /* retrieve the actual port number we are listening on */
     if (getsockname(s, reinterpret_cast<struct sockaddr*>(sockaddr), &addrlen) == -1) {
         if (!error_once) {
-            ESP_LOGE(TAG, "getsockname() failed: %s", strerror(errno));
+            LOGE(TAG, "getsockname() failed: %s", strerror(errno));
             error_once = true;
         }
         close(s);
@@ -121,7 +121,7 @@ int check_interface(struct v2g_context* v2g_ctx) {
 
     mreq.ipv6mr_interface = if_nametoindex(v2g_ctx->if_name);
     if (!mreq.ipv6mr_interface) {
-        ESP_LOGE(TAG, "No such interface: %s", v2g_ctx->if_name);
+        LOGE(TAG, "No such interface: %s", v2g_ctx->if_name);
         return -1;
     }
 
@@ -141,7 +141,7 @@ int connection_init(struct v2g_context* v2g_ctx) {
     if (v2g_ctx->tls_security != TLS_SECURITY_FORCE) {
         v2g_ctx->local_tcp_addr = static_cast<sockaddr_in6*>(calloc(1, sizeof(*v2g_ctx->local_tcp_addr)));
         if (v2g_ctx->local_tcp_addr == nullptr) {
-            ESP_LOGE(TAG, "Failed to allocate memory for TCP address");
+            LOGE(TAG, "Failed to allocate memory for TCP address");
             return -1;
         }
     }
@@ -149,7 +149,7 @@ int connection_init(struct v2g_context* v2g_ctx) {
     if (v2g_ctx->tls_security != TLS_SECURITY_PROHIBIT) {
         v2g_ctx->local_tls_addr = static_cast<sockaddr_in6*>(calloc(1, sizeof(*v2g_ctx->local_tls_addr)));
         if (!v2g_ctx->local_tls_addr) {
-            ESP_LOGE(TAG, "Failed to allocate memory for TLS address");
+            LOGE(TAG, "Failed to allocate memory for TLS address");
             return -1;
         }
     }
@@ -187,11 +187,11 @@ int connection_init(struct v2g_context* v2g_ctx) {
                 continue;
             }
             if (inet_ntop(AF_INET6, &v2g_ctx->local_tcp_addr->sin6_addr, buffer, sizeof(buffer)) != nullptr) {
-                ESP_LOGI(TAG, "TCP server on %s is listening on port [%s%%%" PRIu32 "]:%" PRIu16,
+                LOGI(TAG, "TCP server on %s is listening on port [%s%%%" PRIu32 "]:%" PRIu16,
                      v2g_ctx->if_name, buffer, v2g_ctx->local_tcp_addr->sin6_scope_id,
                      ntohs(v2g_ctx->local_tcp_addr->sin6_port));
             } else {
-                ESP_LOGE(TAG, "TCP server on %s is listening, but inet_ntop failed: %s", v2g_ctx->if_name,
+                LOGE(TAG, "TCP server on %s is listening, but inet_ntop failed: %s", v2g_ctx->if_name,
                      strerror(errno));
                 return -1;
             }
@@ -215,11 +215,11 @@ int connection_init(struct v2g_context* v2g_ctx) {
             }
 
             if (inet_ntop(AF_INET6, &v2g_ctx->local_tls_addr->sin6_addr, buffer, sizeof(buffer)) != nullptr) {
-                ESP_LOGI(TAG, "TLS server on %s is listening on port [%s%%%" PRIu32 "]:%" PRIu16,
+                LOGI(TAG, "TLS server on %s is listening on port [%s%%%" PRIu32 "]:%" PRIu16,
                      v2g_ctx->if_name, buffer, v2g_ctx->local_tls_addr->sin6_scope_id,
                      ntohs(v2g_ctx->local_tls_addr->sin6_port));
             } else {
-                ESP_LOGI(TAG, "TLS server on %s is listening, but inet_ntop failed: %s", v2g_ctx->if_name,
+                LOGI(TAG, "TLS server on %s is listening, but inet_ntop failed: %s", v2g_ctx->if_name,
                      strerror(errno));
                 return -1;
             }
@@ -246,7 +246,7 @@ bool is_sequence_timeout(struct timespec ts_start, struct v2g_context* ctx) {
 
     if (((clock_gettime(CLOCK_MONOTONIC, &ts_current)) != 0) ||
         (timespec_to_ms(timespec_sub(ts_current, ts_start)) > sequence_timeout)) {
-        ESP_LOGE(TAG, "Sequence timeout has occurred (message: %s)", v2g_msg_type[ctx->current_v2g_msg]);
+        LOGE(TAG, "Sequence timeout has occurred (message: %s)", v2g_msg_type[ctx->current_v2g_msg]);
         return true;
     }
     return false;
@@ -265,7 +265,7 @@ ssize_t connection_read(struct v2g_connection* conn, unsigned char* buf, size_t 
     int bytes_read = 0;
 
     if (clock_gettime(CLOCK_MONOTONIC, &ts_start) == -1) {
-        ESP_LOGE(TAG, "clock_gettime(ts_start) failed: %s", strerror(errno));
+        LOGE(TAG, "clock_gettime(ts_start) failed: %s", strerror(errno));
         return -1;
     }
 
@@ -319,7 +319,7 @@ ssize_t connection_read(struct v2g_connection* conn, unsigned char* buf, size_t 
     }
 
     if (conn->ctx->is_connection_terminated == true) {
-        ESP_LOGE(TAG, "Reading from tcp-socket aborted");
+        LOGE(TAG, "Reading from tcp-socket aborted");
         return -2;
     }
 
@@ -381,15 +381,15 @@ void connection_teardown(struct v2g_connection* conn) {
     /* print dlink status */
     switch (conn->dlink_action) {
     case MQTT_DLINK_ACTION_ERROR:
-        ESP_LOGV(TAG, "d_link/error");
+        LOGV(TAG, "d_link/error");
         break;
     case MQTT_DLINK_ACTION_TERMINATE:
         conn->ctx->p_charger->publish_dlink_terminate(nullptr);
-        ESP_LOGV(TAG, "d_link/terminate");
+        LOGV(TAG, "d_link/terminate");
         break;
     case MQTT_DLINK_ACTION_PAUSE:
         conn->ctx->p_charger->publish_dlink_pause(nullptr);
-        ESP_LOGV(TAG, "d_link/pause");
+        LOGV(TAG, "d_link/pause");
         break;
     }
 }
@@ -401,36 +401,36 @@ static void connection_handle_tcp(void* data) {
     struct v2g_connection* conn = static_cast<struct v2g_connection*>(data);
     int rv = 0;
 
-    ESP_LOGI(TAG, "Started new TCP connection thread");
+    LOGI(TAG, "Started new TCP connection thread");
 
     /* check if the v2g-session is already running in another thread, if not, handle v2g-connection */
     if (conn->ctx->state == 0) {
         int rv2 = v2g_handle_connection(conn);
 
         if (rv2 != 0) {
-            ESP_LOGI(TAG, "v2g_handle_connection exited with %d", rv2);
+            LOGI(TAG, "v2g_handle_connection exited with %d", rv2);
         }
     } else {
         rv = ERROR_SESSION_ALREADY_STARTED;
-        ESP_LOGW(TAG, "%s", "Closing tcp-connection. v2g-session is already running");
+        LOGW(TAG, "%s", "Closing tcp-connection. v2g-session is already running");
     }
 
     /* tear down connection gracefully */
-    ESP_LOGI(TAG, "Closing TCP connection");
+    LOGI(TAG, "Closing TCP connection");
 
     vTaskDelay(2000);
 
     if (shutdown(conn->conn.socket_fd, SHUT_RDWR) == -1) {
-        ESP_LOGE(TAG, "shutdown() failed: %s", strerror(errno));
+        LOGE(TAG, "shutdown() failed: %s", strerror(errno));
     }
 
     // Waiting for client closing the connection
     vTaskDelay(3000);
 
     if (close(conn->conn.socket_fd) == -1) {
-        ESP_LOGE(TAG, "close() failed: %s", strerror(errno));
+        LOGE(TAG, "close() failed: %s", strerror(errno));
     }
-    ESP_LOGI(TAG, "TCP connection closed gracefully");
+    LOGI(TAG, "TCP connection closed gracefully");
 
     if (rv != ERROR_SESSION_ALREADY_STARTED) {
         /* cleanup and notify lower layers */
@@ -455,7 +455,7 @@ static void connection_server(void* data) {
         free(conn);
         conn = static_cast<v2g_connection*>(calloc(1, sizeof(*conn)));
         if (!conn) {
-            ESP_LOGE(TAG, "Calloc failed: %s", strerror(errno));
+            LOGE(TAG, "Calloc failed: %s", strerror(errno));
             break;
         }
 
@@ -468,15 +468,15 @@ static void connection_server(void* data) {
         /* wait for an incoming connection */
         conn->conn.socket_fd = accept(ctx->tcp_socket, (struct sockaddr*)&addr, &addrlen);
         if (conn->conn.socket_fd == -1) {
-            ESP_LOGE(TAG, "Accept(tcp) failed: %s", strerror(errno));
+            LOGE(TAG, "Accept(tcp) failed: %s", strerror(errno));
             continue;
         }
 
         if (inet_ntop(AF_INET6, &addr, client_addr, sizeof(client_addr)) != NULL) {
-            ESP_LOGI(TAG, "Incoming connection on %s from [%s]:%" PRIu16, ctx->if_name, client_addr,
+            LOGI(TAG, "Incoming connection on %s from [%s]:%" PRIu16, ctx->if_name, client_addr,
                  ntohs(addr.sin6_port));
         } else {
-            ESP_LOGE(TAG, "Incoming connection on %s, but inet_ntop failed: %s", ctx->if_name,
+            LOGE(TAG, "Incoming connection on %s, but inet_ntop failed: %s", ctx->if_name,
                  strerror(errno));
         }
 
@@ -484,7 +484,7 @@ static void connection_server(void* data) {
         conn->ctx->udp_port = ntohs(addr.sin6_port);
 
         if (xTaskCreate(connection_handle_tcp, "conn_tcp", 4096, conn, 5, &conn->thread_id) != pdPASS) {
-            ESP_LOGE(TAG, "xTaskCreate() failed");
+            LOGE(TAG, "xTaskCreate() failed");
             continue;
         }
 
@@ -504,7 +504,7 @@ int connection_start_servers(struct v2g_context* ctx) {
     if (ctx->tcp_socket != -1) {
         rv = xTaskCreate(connection_server, "tcp_srv", 4096, ctx, 5, &ctx->tcp_thread);
         if (rv != pdPASS) {
-            ESP_LOGE(TAG, "xTaskCreate(tcp) failed");
+            LOGE(TAG, "xTaskCreate(tcp) failed");
             return -1;
         }
         tcp_started = 1;
@@ -516,7 +516,7 @@ int connection_start_servers(struct v2g_context* ctx) {
             if (tcp_started) {
                 vTaskDelete(ctx->tcp_thread);
             }
-            ESP_LOGE(TAG, "xTaskCreate(tls) failed: %s", strerror(errno));
+            LOGE(TAG, "xTaskCreate(tls) failed: %s", strerror(errno));
             return -1;
         }
     }
@@ -529,7 +529,7 @@ int create_udp_socket(const uint16_t udp_port, const char* interface_name) {
 
     int udp_socket = socket(AF_INET6, SOCK_DGRAM, 0);
     if (udp_socket < 0) {
-        ESP_LOGE(TAG, "Could not create socket: %s", strerror(errno));
+        LOGE(TAG, "Could not create socket: %s", strerror(errno));
         return udp_socket;
     }
 
@@ -547,37 +547,37 @@ int create_udp_socket(const uint16_t udp_port, const char* interface_name) {
     }
 
     if (!could_bind) {
-        ESP_LOGE(TAG, "Could not bind: %s", strerror(errno));
+        LOGE(TAG, "Could not bind: %s", strerror(errno));
         return -1;
     }
 
-    ESP_LOGI(TAG, "UDP socket bound to source port: %d", source_port);
+    LOGI(TAG, "UDP socket bound to source port: %d", source_port);
 
     const auto index = if_nametoindex(interface_name);
     auto mreq = ipv6_mreq{};
     mreq.ipv6mr_interface = index;
     if (inet_pton(AF_INET6, LINK_LOCAL_MULTICAST, &mreq.ipv6mr_multiaddr) <= 0) {
-        ESP_LOGE(TAG, "Failed to setup multicast address %s", strerror(errno));
+        LOGE(TAG, "Failed to setup multicast address %s", strerror(errno));
         return -1;
     }
     if (setsockopt(udp_socket, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
-        ESP_LOGE(TAG, "Could not add multicast group membership: %s", strerror(errno));
+        LOGE(TAG, "Could not add multicast group membership: %s", strerror(errno));
         return -1;
     }
 
     if (setsockopt(udp_socket, IPPROTO_IPV6, IPV6_MULTICAST_IF, &index, sizeof(index)) < 0) {
-        ESP_LOGE(TAG, "Could not set interface name: %s with error: %s", interface_name, strerror(errno));
+        LOGE(TAG, "Could not set interface name: %s with error: %s", interface_name, strerror(errno));
     }
 
     // destination setup
     sockaddr_in6 destination_address = {AF_INET6, htons(udp_port)};
     if (inet_pton(AF_INET6, LINK_LOCAL_MULTICAST, &destination_address.sin6_addr) <= 0) {
-        ESP_LOGE(TAG, "Failed to setup server address %s", strerror(errno));
+        LOGE(TAG, "Failed to setup server address %s", strerror(errno));
     }
     const auto connected =
         connect(udp_socket, reinterpret_cast<sockaddr*>(&destination_address), sizeof(sockaddr_in6)) == 0;
     if (!connected) {
-        ESP_LOGE(TAG, "Could not connect: %s", strerror(errno));
+        LOGE(TAG, "Could not connect: %s", strerror(errno));
         return -1;
     }
 

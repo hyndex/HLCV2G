@@ -4,7 +4,7 @@
 #include <EvseV2G.hpp>
 #include "connection/connection.hpp"
 #include "connection/tls_connection.hpp"
-#include "esp_log.h"
+#include "logging.hpp"
 #include "sdp.hpp"
 #include <everest/logging.hpp>
 
@@ -38,7 +38,7 @@ void EvseV2G::init() {
                 return;
             }
 
-            ESP_LOGI(TAG, "Certificate store update received, reconfiguring TLS server");
+            LOGI(TAG, "Certificate store update received, reconfiguring TLS server");
             tls::config_t config;
             (void)build_config(config, v2g_ctx);
         });
@@ -50,12 +50,12 @@ void EvseV2G::init() {
 void EvseV2G::ready() {
     int rv = 0;
 
-    ESP_LOGD(TAG, "Starting SDP responder");
+    LOGD(TAG, "Starting SDP responder");
 
     rv = connection_init(v2g_ctx);
 
     if (rv == -1) {
-        ESP_LOGE(TAG, "Failed to initialize connection");
+        LOGE(TAG, "Failed to initialize connection");
         goto err_out;
     }
 
@@ -63,14 +63,14 @@ void EvseV2G::ready() {
         rv = sdp_init(v2g_ctx);
 
         if (rv == -1) {
-            ESP_LOGE(TAG, "Failed to start SDP responder");
+            LOGE(TAG, "Failed to start SDP responder");
             goto err_out;
         }
     }
 
-    ESP_LOGD(TAG, "starting socket server(s)");
+    LOGD(TAG, "starting socket server(s)");
     if (connection_start_servers(v2g_ctx)) {
-        ESP_LOGE(TAG, "start_connection_servers() failed");
+        LOGE(TAG, "start_connection_servers() failed");
         goto err_out;
     }
 
@@ -80,7 +80,7 @@ void EvseV2G::ready() {
     rv = sdp_listen(v2g_ctx);
 
     if (rv == -1) {
-        ESP_LOGE(TAG, "sdp_listen() failed");
+        LOGE(TAG, "sdp_listen() failed");
         goto err_out;
     }
 
