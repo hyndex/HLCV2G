@@ -1,18 +1,16 @@
 #include "logging.hpp"
-#include <cstdio>
 
-static void default_log_write(int level, const char* tag, const char* fmt, va_list args) {
-    (void)level;
-    std::fprintf(stderr, "%s: ", tag);
-    std::vfprintf(stderr, fmt, args);
-    std::fprintf(stderr, "\n");
+static void null_log_write(int, const char*, const char*, va_list) {}
+
+static log_write_fn current_backend = null_log_write;
+
+void log_set_backend(log_write_fn fn) {
+    current_backend = fn ? fn : null_log_write;
 }
-
-log_write_fn log_write = default_log_write;
 
 void log_message(int level, const char* tag, const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    log_write(level, tag, fmt, args);
+    current_backend(level, tag, fmt, args);
     va_end(args);
 }

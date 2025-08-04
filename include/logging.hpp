@@ -6,8 +6,11 @@ extern "C" {
 #endif
 
 typedef void (*log_write_fn)(int level, const char* tag, const char* fmt, va_list args);
+// Register a custom backend. Passing nullptr disables logging.
+void log_set_backend(log_write_fn fn);
 
-extern log_write_fn log_write;
+// Initialize logging with the platform's default backend.
+void log_init();
 
 void log_message(int level, const char* tag, const char* fmt, ...);
 
