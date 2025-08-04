@@ -52,6 +52,8 @@ target_sources(${MODULE_NAME}
         "din_server.cpp"
         "utils/session_utils.cpp"
         "logging.cpp"
+        "platform/posix/logging.cpp"
+        "platform/esp/logging.cpp"
         "sdp.cpp"
         "tools.cpp"
         "v2g_ctx.cpp"

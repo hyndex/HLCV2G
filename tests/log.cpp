@@ -40,12 +40,15 @@ extern "C" void test_log_writer(int level, const char* tag, const char* format, 
         add_log(static_cast<dloglevel_t>(level), event);
     }
 }
+static log_write_fn current_writer = test_log_writer;
 
-log_write_fn log_write = test_log_writer;
+extern "C" void log_set_backend(log_write_fn fn) {
+    current_writer = fn ? fn : test_log_writer;
+}
 
 extern "C" void log_message(int level, const char* tag, const char* format, ...) {
     va_list ap;
     va_start(ap, format);
-    log_write(level, tag, format, ap);
+    current_writer(level, tag, format, ap);
     va_end(ap);
 }
