@@ -5,6 +5,7 @@
 #include "logging.hpp"
 #include <v2g_ctx.hpp>
 #include <freertos_sync.hpp>
+#include <platform/time_utils.hpp>
 
 static const char* TAG = "ISO15118";
 
@@ -280,7 +281,7 @@ void ISO15118_chargerImpl::handle_stop_charging(bool& stop) {
                     timeout_reached = false;
                     break;
                 }
-                std::this_thread::sleep_for(1s);
+                time_utils::delay_ms(1000);
             }
 
             // If it did not stop within timeout, stop session using FAILED reply

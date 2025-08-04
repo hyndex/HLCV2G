@@ -24,6 +24,7 @@
 #include <iso_server.hpp>
 #include "logging.hpp"
 #include <tools.hpp>
+#include <platform/time_utils.hpp>
 
 static const char* TAG = "v2g_server";
 
@@ -560,7 +561,7 @@ int v2g_handle_connection(struct v2g_connection* conn) {
 
             if (time_to_conf_res < MAX_RES_TIME) {
                 // LOGE(TAG, "time_to_conf_res %llu", time_to_conf_res);
-                std::this_thread::sleep_for(std::chrono::microseconds((MAX_RES_TIME - time_to_conf_res) * 1000));
+                time_utils::delay_ms(MAX_RES_TIME - time_to_conf_res);
             } else {
                 LOGW(TAG, "Response message (type %d) not configured within %d ms (took %" PRIi64 " ms)",
                      conn->ctx->current_v2g_msg, MAX_RES_TIME, time_to_conf_res);

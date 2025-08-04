@@ -2,6 +2,7 @@
 #define FREERTOS_SYNC_HPP
 
 #include <freertos_shim.hpp>
+#include <platform/time_utils.hpp>
 #include <cerrno>
 #include <ctime>
 
@@ -24,10 +25,8 @@ inline void frt_cond_signal(FrtCond* c) { xSemaphoreGive(c->sem); }
 
 inline int frt_cond_timedwait(FrtCond* c, FrtMutex* m, const struct timespec* abs) {
     frt_mutex_unlock(m);
-    struct timespec now;
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    int64_t now_ms = now.tv_sec * 1000LL + now.tv_nsec / 1000000;
-    int64_t abs_ms = abs->tv_sec * 1000LL + abs->tv_nsec / 1000000;
+    int64_t now_ms = time_utils::get_monotonic_time_ms();
+    int64_t abs_ms = time_utils::timespec_to_ms(*abs);
     int64_t diff_ms = abs_ms - now_ms;
     if (diff_ms < 0) diff_ms = 0;
     bool ok = xSemaphoreTake(c->sem, (TickType_t)diff_ms);

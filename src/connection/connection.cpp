@@ -28,6 +28,7 @@ static const char* TAG = "connection";
 #include <time.h>
 #include <freertos_shim.hpp>
 #include <unistd.h>
+#include <platform/time_utils.hpp>
 
 #define DEFAULT_SOCKET_BACKLOG        3
 #define DEFAULT_TCP_PORT              61341
@@ -244,8 +245,8 @@ bool is_sequence_timeout(struct timespec ts_start, struct v2g_context* ctx) {
     struct timespec ts_current;
     int sequence_timeout = V2G_SEQUENCE_TIMEOUT_60S;
 
-    if (((clock_gettime(CLOCK_MONOTONIC, &ts_current)) != 0) ||
-        (timespec_to_ms(timespec_sub(ts_current, ts_start)) > sequence_timeout)) {
+    time_utils::get_monotonic_time(&ts_current);
+    if (time_utils::timespec_to_ms(timespec_sub(ts_current, ts_start)) > sequence_timeout) {
         LOGE(TAG, "Sequence timeout has occurred (message: %s)", v2g_msg_type[ctx->current_v2g_msg]);
         return true;
     }
@@ -264,10 +265,7 @@ ssize_t connection_read(struct v2g_connection* conn, unsigned char* buf, size_t 
     struct timespec ts_start;
     int bytes_read = 0;
 
-    if (clock_gettime(CLOCK_MONOTONIC, &ts_start) == -1) {
-        LOGE(TAG, "clock_gettime(ts_start) failed: %s", strerror(errno));
-        return -1;
-    }
+    time_utils::get_monotonic_time(&ts_start);
 
     /* loop until we got all requested bytes or sequence timeout DIN [V2G-DC-432]*/
     while ((bytes_read < count) && (is_sequence_timeout(ts_start, conn->ctx) == false) &&
@@ -278,17 +276,8 @@ ssize_t connection_read(struct v2g_connection* conn, unsigned char* buf, size_t 
         if (conn->is_tls_connection) {
             return -1; // shouldn't be using this function
         }
-        /* use select for timeout handling */
-        struct timeval tv;
-        fd_set read_fds;
-
-        FD_ZERO(&read_fds);
-        FD_SET(conn->conn.socket_fd, &read_fds);
-
-        tv.tv_sec = conn->ctx->network_read_timeout / 1000;
-        tv.tv_usec = (conn->ctx->network_read_timeout % 1000) * 1000;
-
-        num_of_bytes = select(conn->conn.socket_fd + 1, &read_fds, nullptr, nullptr, &tv);
+        /* wait for data on socket */
+        num_of_bytes = time_utils::wait_for_read(conn->conn.socket_fd, conn->ctx->network_read_timeout);
 
         if (num_of_bytes == -1) {
             if (errno == EINTR)

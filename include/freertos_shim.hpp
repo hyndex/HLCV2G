@@ -5,6 +5,7 @@
 #include <chrono>
 #include <semaphore>
 #include <ctime>
+#include <platform/time_utils.hpp>
 
 using TaskHandle_t = std::thread*;
 using TickType_t = uint32_t;
@@ -34,9 +35,7 @@ inline void vTaskDelete(TaskHandle_t task) {
     }
 }
 
-inline void vTaskDelay(TickType_t ms) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(ms));
-}
+inline void vTaskDelay(TickType_t ms) { time_utils::delay_ms(ms); }
 
 using SemaphoreHandle_t = std::binary_semaphore*;
 
