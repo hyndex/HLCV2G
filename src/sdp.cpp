@@ -3,11 +3,10 @@
 // Copyright (C) 2022-2023 Contributors to EVerest
 #include "sdp.hpp"
 #include "logging.hpp"
+#include <platform/network_adapter.hpp>
 
 #include <arpa/inet.h>
-#include <ifaddrs.h>
 #include <inttypes.h>
-#include <net/if.h>
 #include <netinet/in.h>
 
 static const char* TAG = "sdp";
@@ -206,14 +205,14 @@ int sdp_init(struct v2g_context* v2g_ctx) {
     struct ipv6_mreq mreq = {{IN6ADDR_ALLNODES}, 0};
     int enable = 1;
 
-    mreq.ipv6mr_interface = if_nametoindex(v2g_ctx->if_name);
+    mreq.ipv6mr_interface = network_adapter::get_interface_index(v2g_ctx->if_name);
     if (!mreq.ipv6mr_interface) {
         LOGE(TAG, "No such interface: %s", v2g_ctx->if_name);
         return -1;
     }
 
     /* create receiving socket */
-    v2g_ctx->sdp_socket = socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
+    v2g_ctx->sdp_socket = network_adapter::create_socket(AF_INET6, SOCK_DGRAM, IPPROTO_UDP);
     if (v2g_ctx->sdp_socket == -1) {
         LOGE(TAG, "socket() failed: %s", strerror(errno));
         return -1;
@@ -227,7 +226,7 @@ int sdp_init(struct v2g_context* v2g_ctx) {
 
     sdp_addr.sin6_addr = in6addr_any;
 
-    if (bind(v2g_ctx->sdp_socket, (struct sockaddr*)&sdp_addr, sizeof(sdp_addr)) == -1) {
+    if (network_adapter::bind(v2g_ctx->sdp_socket, (struct sockaddr*)&sdp_addr, sizeof(sdp_addr)) == -1) {
         LOGE(TAG, "bind() failed: %s", strerror(errno));
         close(v2g_ctx->sdp_socket);
         return -1;
@@ -246,7 +245,7 @@ int sdp_init(struct v2g_context* v2g_ctx) {
     LOGV(TAG, "bind only to specified device");
 
     /* join multicast group */
-    if (setsockopt(v2g_ctx->sdp_socket, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq, sizeof(mreq)) == -1) {
+    if (network_adapter::join_multicast(v2g_ctx->sdp_socket, &mreq) == -1) {
         LOGE(TAG, "setsockopt(IPV6_JOIN_GROUP) failed: %s", strerror(errno));
         close(v2g_ctx->sdp_socket);
         return -1;

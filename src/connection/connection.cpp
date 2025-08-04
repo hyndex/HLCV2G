@@ -7,6 +7,7 @@
 #include <connection/tls_connection.hpp>
 #include "tools.hpp"
 #include <v2g_server.hpp>
+#include <platform/network_adapter.hpp>
 
 static const char* TAG = "connection";
 
@@ -18,7 +19,6 @@ static const char* TAG = "connection";
 #include <fstream>
 #include <inttypes.h>
 #include <iostream>
-#include <net/if.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -45,7 +45,7 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
     static bool error_once = false;
 
     /* create socket */
-    s = socket(AF_INET6, SOCK_STREAM, 0);
+    s = network_adapter::create_socket(AF_INET6, SOCK_STREAM, 0);
     if (s == -1) {
         if (!error_once) {
             LOGE(TAG, "socket() failed: %s", strerror(errno));
@@ -64,7 +64,7 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
     }
 
     /* bind it to interface */
-    if (bind(s, reinterpret_cast<struct sockaddr*>(sockaddr), addrlen) == -1) {
+    if (network_adapter::bind(s, reinterpret_cast<struct sockaddr*>(sockaddr), addrlen) == -1) {
         if (!error_once) {
             LOGW(TAG, "bind() failed: %s", strerror(errno));
             LOGW(TAG, "Verify that the configured interface has a valid IPv6 link local address configured.");
@@ -75,7 +75,7 @@ static int connection_create_socket(struct sockaddr_in6* sockaddr) {
     }
 
     /* listen on this socket */
-    if (listen(s, DEFAULT_SOCKET_BACKLOG) == -1) {
+    if (network_adapter::listen(s, DEFAULT_SOCKET_BACKLOG) == -1) {
         if (!error_once) {
             LOGE(TAG, "listen() failed: %s", strerror(errno));
             error_once = true;
@@ -119,7 +119,7 @@ int check_interface(struct v2g_context* v2g_ctx) {
         return -1;
     }
 
-    mreq.ipv6mr_interface = if_nametoindex(v2g_ctx->if_name);
+    mreq.ipv6mr_interface = network_adapter::get_interface_index(v2g_ctx->if_name);
     if (!mreq.ipv6mr_interface) {
         LOGE(TAG, "No such interface: %s", v2g_ctx->if_name);
         return -1;
@@ -527,7 +527,7 @@ int connection_start_servers(struct v2g_context* ctx) {
 int create_udp_socket(const uint16_t udp_port, const char* interface_name) {
     constexpr auto LINK_LOCAL_MULTICAST = "ff02::1";
 
-    int udp_socket = socket(AF_INET6, SOCK_DGRAM, 0);
+    int udp_socket = network_adapter::create_socket(AF_INET6, SOCK_DGRAM, 0);
     if (udp_socket < 0) {
         LOGE(TAG, "Could not create socket: %s", strerror(errno));
         return udp_socket;
@@ -540,7 +540,7 @@ int create_udp_socket(const uint16_t udp_port, const char* interface_name) {
     auto source_port = 49152;
     for (; source_port < 65535; source_port++) {
         sockaddr_in6 source_address = {AF_INET6, htons(source_port)};
-        if (bind(udp_socket, reinterpret_cast<sockaddr*>(&source_address), sizeof(sockaddr_in6)) == 0) {
+        if (network_adapter::bind(udp_socket, reinterpret_cast<sockaddr*>(&source_address), sizeof(sockaddr_in6)) == 0) {
             could_bind = true;
             break;
         }
@@ -553,14 +553,14 @@ int create_udp_socket(const uint16_t udp_port, const char* interface_name) {
 
     LOGI(TAG, "UDP socket bound to source port: %d", source_port);
 
-    const auto index = if_nametoindex(interface_name);
+    const auto index = network_adapter::get_interface_index(interface_name);
     auto mreq = ipv6_mreq{};
     mreq.ipv6mr_interface = index;
     if (inet_pton(AF_INET6, LINK_LOCAL_MULTICAST, &mreq.ipv6mr_multiaddr) <= 0) {
         LOGE(TAG, "Failed to setup multicast address %s", strerror(errno));
         return -1;
     }
-    if (setsockopt(udp_socket, IPPROTO_IPV6, IPV6_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0) {
+    if (network_adapter::join_multicast(udp_socket, &mreq) < 0) {
         LOGE(TAG, "Could not add multicast group membership: %s", strerror(errno));
         return -1;
     }

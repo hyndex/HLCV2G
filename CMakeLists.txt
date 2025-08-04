@@ -31,6 +31,7 @@ pkg_search_module(EVENT REQUIRED libevent)
 target_include_directories(${MODULE_NAME} PRIVATE
     crypto
     connection
+    platform
 )
 
 target_link_libraries(${MODULE_NAME} PUBLIC ${EVENT_LIBRARIES} -levent -lpthread -levent_pthreads)
@@ -54,6 +55,8 @@ target_sources(${MODULE_NAME}
         "v2g_ctx.cpp"
         "v2g_server.cpp"
         "mbedtls_util.cpp"
+        "platform/posix/network_adapter.cpp"
+        "platform/esp/network_adapter.cpp"
 )
 
 target_link_libraries(${MODULE_NAME}

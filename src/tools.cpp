@@ -3,11 +3,9 @@
 // Copyright (C) 2022-2023 Contributors to EVerest
 #include "tools.hpp"
 #include "logging.hpp"
-#include <arpa/inet.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <ifaddrs.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
 #include <iomanip>
@@ -22,9 +20,7 @@
 static const char* TAG = "tools";
 #include <time.h>
 #include <unistd.h>
-#ifdef ESP_PLATFORM
-#include "esp_netif.h"
-#endif
+#include <platform/network_adapter.hpp>
 
 static mbedtls_entropy_context entropy_ctx;
 static mbedtls_ctr_drbg_context ctr_drbg_ctx;
@@ -73,122 +69,11 @@ int generate_random_data(void* dest, size_t dest_len) {
 }
 
 const char* choose_first_ipv6_interface() {
-#ifdef ESP_PLATFORM
-#ifdef CONFIG_V2G_IPV6_NETIF
-    return CONFIG_V2G_IPV6_NETIF;
-#else
-    /* Default to WiFi station interface if nothing configured */
-    return "WIFI_STA_DEF";
-#endif
-#else
-    struct ifaddrs *ifaddr, *ifa;
-    char buffer[INET6_ADDRSTRLEN];
-
-    if (getifaddrs(&ifaddr) == -1)
-        return NULL;
-
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr)
-            continue;
-
-        if (ifa->ifa_addr->sa_family == AF_INET6) {
-            inet_ntop(AF_INET6, &ifa->ifa_addr->sa_data, buffer, sizeof(buffer));
-            if (strstr(buffer, "fe80") != NULL) {
-                return ifa->ifa_name;
-            }
-        }
-    }
-    LOGE(TAG, "No necessary IPv6 link-local address was found!");
-    return NULL;
-#endif
+    return network_adapter::choose_first_ipv6_interface();
 }
 
 int get_interface_ipv6_address(const char* if_name, enum Addr6Type type, struct sockaddr_in6* addr) {
-#ifdef ESP_PLATFORM
-    esp_netif_t* netif = esp_netif_get_handle_from_ifkey(if_name);
-    if (!netif) {
-        LOGE(TAG, "esp_netif %s not found", if_name);
-        return -1;
-    }
-
-    esp_ip6_addr_t ip6;
-    esp_err_t err;
-
-    switch (type) {
-    case ADDR6_TYPE_LINKLOCAL:
-        err = esp_netif_get_ip6_linklocal(netif, &ip6);
-        break;
-    case ADDR6_TYPE_GLOBAL:
-        err = esp_netif_get_ip6_global(netif, &ip6);
-        break;
-    default:
-        err = esp_netif_get_ip6_global(netif, &ip6);
-        if (err != ESP_OK) {
-            err = esp_netif_get_ip6_linklocal(netif, &ip6);
-        }
-        break;
-    }
-
-    if (err != ESP_OK) {
-        LOGE(TAG, "Failed to get IPv6 address for %s", if_name);
-        return -1;
-    }
-
-    memset(addr, 0, sizeof(*addr));
-    addr->sin6_family = AF_INET6;
-    memcpy(&addr->sin6_addr, ip6.addr, sizeof(ip6.addr));
-    addr->sin6_scope_id = ip6.zone ? ip6.zone : esp_netif_get_netif_impl_index(netif);
-    return 0;
-#else
-    struct ifaddrs *ifaddr, *ifa;
-    int rv = -1;
-
-    // If using loopback device, accept any address
-    // (lo usually does not have a link local address)
-    if (strcmp(if_name, "lo") == 0) {
-        type = ADDR6_TYPE_UNPSEC;
-    }
-
-    if (getifaddrs(&ifaddr) == -1)
-        return -1;
-
-    for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-        if (!ifa->ifa_addr)
-            continue;
-
-        if (ifa->ifa_addr->sa_family != AF_INET6)
-            continue;
-
-        if (strcmp(ifa->ifa_name, if_name) != 0)
-            continue;
-
-        /* on Linux the scope_id is interface index for link-local addresses */
-        switch (type) {
-        case ADDR6_TYPE_GLOBAL: /* no link-local address requested */
-            if ((reinterpret_cast<struct sockaddr_in6*>(ifa->ifa_addr))->sin6_scope_id != 0)
-                continue;
-            break;
-
-        case ADDR6_TYPE_LINKLOCAL: /* link-local address requested */
-            if ((reinterpret_cast<struct sockaddr_in6*>(ifa->ifa_addr))->sin6_scope_id == 0)
-                continue;
-            break;
-
-        default: /* any address of the interface requested */
-            /* use first found */
-            break;
-        }
-
-        memcpy(addr, ifa->ifa_addr, sizeof(*addr));
-
-        rv = 0;
-        goto out;
-    }
-
-out:
-    freeifaddrs(ifaddr);
-    return rv;
-#endif
+    return network_adapter::get_interface_ipv6_address(if_name, type, addr);
 }
 
 #define NSEC_PER_SEC 1000000000L
