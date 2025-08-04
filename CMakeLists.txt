@@ -34,6 +34,8 @@ target_include_directories(${MODULE_NAME} PRIVATE
     platform
 )
 
+target_compile_definitions(${MODULE_NAME} PRIVATE POSIX_PLATFORM)
+
 target_link_libraries(${MODULE_NAME} PUBLIC ${EVENT_LIBRARIES} -levent -lpthread -levent_pthreads)
 
 target_link_libraries(${MODULE_NAME}

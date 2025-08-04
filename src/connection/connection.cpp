@@ -26,7 +26,7 @@ static const char* TAG = "connection";
 #include <string>
 #include <sys/socket.h>
 #include <time.h>
-#include <freertos_shim.hpp>
+#include <platform/freertos_shim.hpp>
 #include <unistd.h>
 #include <platform/time_utils.hpp>
 

@@ -1,7 +1,7 @@
 #ifndef FREERTOS_SYNC_HPP
 #define FREERTOS_SYNC_HPP
 
-#include <freertos_shim.hpp>
+#include <platform/freertos_shim.hpp>
 #include <platform/time_utils.hpp>
 #include <cerrno>
 #include <ctime>
