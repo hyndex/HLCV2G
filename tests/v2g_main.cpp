@@ -16,6 +16,8 @@
 #include <optional>
 #include <thread>
 #include <unistd.h>
+#include <platform/time_utils.hpp>
+#include <platform/time_utils.hpp>
 
 #include "ISO15118_chargerImplStub.hpp"
 #include "ModuleAdapterStub.hpp"
@@ -144,7 +146,7 @@ int main(int argc, char** argv) {
 
         std::thread stop([ctx]() {
             // there is a 60 second read timeout in connection.cpp
-            std::this_thread::sleep_for(75s);
+            time_utils::delay_ms(75000);
             std::cout << "shutdown" << std::endl;
             ctx->is_connection_terminated = true;
             ctx->shutdown = true;
@@ -168,7 +170,7 @@ int main(int argc, char** argv) {
 
 
         // wait for v2g_ctx_start_events thread to stop
-        std::this_thread::sleep_for(2s);
+        time_utils::delay_ms(2000);
         v2g_ctx_free(ctx);
     }
 

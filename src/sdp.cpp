@@ -10,7 +10,7 @@
 #include <netinet/in.h>
 
 static const char* TAG = "sdp";
-#include <poll.h>
+#include <platform/time_utils.hpp>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -257,9 +257,6 @@ int sdp_init(struct v2g_context* v2g_ctx) {
 }
 
 int sdp_listen(struct v2g_context* v2g_ctx) {
-    /* Init pollfd struct */
-    struct pollfd pollfd = {v2g_ctx->sdp_socket, POLLIN, 0};
-
     while (!v2g_ctx->shutdown) {
         uint8_t buffer[SDP_HEADER_LEN + SDP_REQUEST_PAYLOAD_LEN];
         char addrbuf[INET6_ADDRSTRLEN] = {0};
@@ -270,13 +267,13 @@ int sdp_listen(struct v2g_context* v2g_ctx) {
         socklen_t addrlen = sizeof(sdp_query.remote_addr);
 
         /* Check if data was received on socket */
-        signed status = poll(&pollfd, 1, POLL_TIMEOUT);
+        int status = time_utils::wait_for_read(v2g_ctx->sdp_socket, POLL_TIMEOUT);
 
         if (status == -1) {
             if (errno == EINTR) { // If the call did not succeed because it was interrupted
                 continue;
             } else {
-                LOGE(TAG, "poll() failed: %s", strerror(errno));
+                LOGE(TAG, "wait_for_read failed: %s", strerror(errno));
                 continue;
             }
         }

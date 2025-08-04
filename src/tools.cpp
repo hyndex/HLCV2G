@@ -21,6 +21,7 @@ static const char* TAG = "tools";
 #include <time.h>
 #include <unistd.h>
 #include <platform/network_adapter.hpp>
+#include <platform/time_utils.hpp>
 
 static mbedtls_entropy_context entropy_ctx;
 static mbedtls_ctr_drbg_context ctr_drbg_ctx;
@@ -118,9 +119,7 @@ long long timespec_to_ms(struct timespec ts) {
 }
 
 long long int getmonotonictime() {
-    struct timespec time;
-    clock_gettime(CLOCK_MONOTONIC, &time);
-    return time.tv_sec * 1000 + time.tv_nsec / 1000000;
+    return time_utils::get_monotonic_time_ms();
 }
 
 double calc_physical_value(const int16_t& value, const int8_t& multiplier) {

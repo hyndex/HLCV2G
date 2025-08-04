@@ -56,7 +56,9 @@ target_sources(${MODULE_NAME}
         "v2g_server.cpp"
         "mbedtls_util.cpp"
         "platform/posix/network_adapter.cpp"
+        "platform/posix/time_utils.cpp"
         "platform/esp/network_adapter.cpp"
+        "platform/esp/time_utils.cpp"
 )
 
 target_link_libraries(${MODULE_NAME}

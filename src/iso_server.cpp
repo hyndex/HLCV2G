@@ -26,6 +26,7 @@ using namespace crypto::mbedtls;
 #include <v2g_ctx.hpp>
 #include <v2g_server.hpp>
 #include "utils/session_utils.hpp"
+#include <platform/time_utils.hpp>
 
 static const char* TAG = "iso_server";
 
@@ -57,7 +58,7 @@ static iso2_responseCodeType iso_validate_state(int state, enum V2gMsgTypeId cur
 
 static bool wait_for_cp_states(struct v2g_context* ctx, cp_state s1, cp_state s2, long timeout_ms) {
     struct timespec ts_abs_timeout;
-    clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
+    time_utils::get_monotonic_time(&ts_abs_timeout);
     timespec_add_ms(&ts_abs_timeout, timeout_ms);
     int rv = 0;
     while ((ctx->cp_state != s1 && ctx->cp_state != s2) && (rv == 0) &&
@@ -1464,7 +1465,7 @@ static enum v2g_event handle_iso_power_delivery(struct v2g_connection* conn) {
                 conn->ctx->session.is_charging = true;
 
                 /* determine timeout for contactor */
-                clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
+                time_utils::get_monotonic_time(&ts_abs_timeout);
                 timespec_add_ms(&ts_abs_timeout, V2G_CONTACTOR_CLOSE_TIMEOUT);
 
                 /* wait for contactor to really close or timeout */
@@ -1739,7 +1740,7 @@ static enum v2g_event handle_iso_certificate_update(struct v2g_connection* conn)
     }
 
     /* Waiting for the CertUpdateExiRes msg */
-    clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
+    time_utils::get_monotonic_time(&ts_abs_timeout);
     timespec_add_ms(&ts_abs_timeout, V2G_SECC_MSG_CERTINSTALL_TIME);
     LOGI(TAG, "Waiting for the CertUpdateExiRes msg");
     while ((rv == 0) && (conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == true) &&
@@ -1808,7 +1809,7 @@ static enum v2g_event handle_iso_certificate_installation(struct v2g_connection*
         goto exit;
     }
     /* Waiting for the CertInstallationExiRes msg */
-    clock_gettime(CLOCK_MONOTONIC, &ts_abs_timeout);
+    time_utils::get_monotonic_time(&ts_abs_timeout);
     timespec_add_ms(&ts_abs_timeout, V2G_SECC_MSG_CERTINSTALL_TIME);
     LOGI(TAG, "Waiting for the CertInstallationExiRes msg");
     while ((rv == 0) && (conn->ctx->evse_v2g_data.cert_install_res_b64_buffer.empty() == true) &&
