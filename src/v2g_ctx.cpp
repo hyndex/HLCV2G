@@ -9,7 +9,7 @@
 #include <errno.h>
 #include <math.h>
 
-#include <freertos_shim.hpp>
+#include <platform/freertos_shim.hpp>
 #include <freertos_sync.hpp>
 
 #include "logging.hpp"
